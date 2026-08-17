@@ -254,16 +254,42 @@ async def ai_select_best(query: AISelectQuery):
     budget = query.budget
     max_products = query.max_products
 
+    # Minimum thresholds for a product to be considered
+    MIN_MONTHLY_SALES = 300  # Reject anything under 300 sales/month
+    MIN_PROFIT = 2.00        # Minimum $2 profit per unit
+    MIN_PRICE = 12.00        # Minimum sell price
+
     # Calculate profitability for each product
     analyzed = []
     for p in products:
-        sell_price = p.get("amazon_price", 0) or p.get("sell_price", 0)
-        if sell_price <= 0:
+        # Get sell price - try ALL possible field names
+        sell_price = (
+            p.get("sell_price", 0) or
+            p.get("amazon_price", 0) or
+            p.get("price", 0) or
+            0
+        )
+
+        # Skip products with no price or too cheap
+        if sell_price < MIN_PRICE:
             continue
 
-        # Estimate wholesale cost (55% of Amazon price for products without supplier cost)
+        # Get monthly sales - this is the MOST IMPORTANT metric
+        monthly_sales = (
+            p.get("monthly_sales_est", 0) or
+            p.get("monthly_sales", 0) or
+            p.get("sales_monthly", 0) or
+            0
+        )
+
+        # HARD FILTER: Reject low-volume products immediately
+        if monthly_sales < MIN_MONTHLY_SALES:
+            continue
+
+        # Get supplier cost (estimate if not provided)
         supplier_cost = p.get("supplier_cost", 0) or (sell_price * 0.55)
 
+        # Calculate profitability
         calc = ProfitCalculator.calculate(
             sell_price=sell_price,
             buy_price=supplier_cost,
@@ -272,59 +298,82 @@ async def ai_select_best(query: AISelectQuery):
             keepa_referral_pct=p.get("referral_fee_pct"),
         )
 
-        # Calculate opportunity score
         roi = calc.get("roi_pct", 0)
         profit = calc.get("net_profit", 0)
-        monthly_sales = p.get("monthly_sales_est", 0) or 0
-        sellers = p.get("fba_seller_count", 99)
-        bsr = p.get("bsr", 999999)
+
+        # Skip if not profitable enough
+        if profit < MIN_PROFIT:
+            continue
+
+        sellers = p.get("fba_seller_count", 99) or 99
+        bsr = p.get("bsr", 999999) or 999999
         is_amazon = p.get("is_amazon_seller", False)
 
-        # Score: higher is better
+        # ═══════════════════════════════════════════
+        # SCORING ALGORITHM - Volume is KING
+        # ═══════════════════════════════════════════
         score = 0
-        if roi >= 25:
+
+        # VOLUME SCORE (0-50 points) - MOST IMPORTANT
+        if monthly_sales >= 10000:
+            score += 50
+        elif monthly_sales >= 5000:
+            score += 40
+        elif monthly_sales >= 2000:
             score += 30
-        elif roi >= 20:
+        elif monthly_sales >= 1000:
+            score += 25
+        elif monthly_sales >= 500:
+            score += 15
+        elif monthly_sales >= 300:
+            score += 5
+
+        # ROI SCORE (0-25 points)
+        if roi >= 30:
+            score += 25
+        elif roi >= 25:
             score += 20
+        elif roi >= 20:
+            score += 15
         elif roi >= 15:
             score += 10
 
-        if profit >= 5:
-            score += 20
+        # PROFIT PER UNIT (0-15 points)
+        if profit >= 8:
+            score += 15
+        elif profit >= 5:
+            score += 12
         elif profit >= 3:
+            score += 8
+        elif profit >= 2:
+            score += 4
+
+        # COMPETITION (0-10 points)
+        if sellers <= 2:
             score += 10
+        elif sellers <= 5:
+            score += 7
+        elif sellers <= 10:
+            score += 4
 
-        if monthly_sales >= 10000:
-            score += 25
-        elif monthly_sales >= 3000:
-            score += 15
-        elif monthly_sales >= 500:
-            score += 5
-
-        if sellers <= 3:
-            score += 15
-        elif sellers <= 8:
-            score += 10
-        elif sellers <= 15:
-            score += 5
-
-        if bsr <= 1000:
-            score += 10
-        elif bsr <= 5000:
-            score += 5
-
+        # PENALTIES
         if is_amazon:
-            score -= 30  # Big penalty for Amazon competition
+            score -= 40  # NEVER compete with Amazon
+
+        if bsr > 50000:
+            score -= 10  # Bad BSR penalty
 
         # Risk assessment
         risk = "BAJO"
         if is_amazon or sellers > 15 or bsr > 50000:
             risk = "ALTO"
-        elif sellers > 8 or bsr > 20000:
+        elif sellers > 8 or bsr > 20000 or monthly_sales < 500:
             risk = "MEDIO"
 
         analyzed.append({
             **p,
+            "sell_price": sell_price,  # Ensure price is set correctly
+            "amazon_price": sell_price,
             "supplier_cost_estimated": round(supplier_cost, 2),
             "calc": calc,
             "score": score,
@@ -338,13 +387,13 @@ async def ai_select_best(query: AISelectQuery):
     # Select top products within budget
     selected = []
     remaining = budget
-    for p in analyzed[:max_products * 2]:  # Consider more candidates
+    for p in analyzed[:max_products * 3]:  # Consider more candidates
         cost = p.get("supplier_cost_estimated", 0)
         if cost <= 0:
             continue
 
         # How many can we buy?
-        qty = min(int(remaining / cost), 20)
+        qty = min(int(remaining / cost), 30)
         if qty < 3:
             continue
 
@@ -370,24 +419,37 @@ async def ai_select_best(query: AISelectQuery):
         ),
         "total_candidates": len(analyzed),
         "budget_used_pct": round((budget - remaining) / budget * 100, 1),
+        "rejected_low_volume": sum(1 for p in products if (p.get("monthly_sales_est", 0) or 0) < MIN_MONTHLY_SALES),
     }
 
 
 def _get_priority_reasons(roi, profit, sales, sellers, is_amazon):
     """Generate reasons why a product is prioritized."""
     reasons = []
+    if sales >= 5000:
+        reasons.append(f"ALTA demanda ({sales:,}/mes)")
+    elif sales >= 1000:
+        reasons.append(f"Buena demanda ({sales:,}/mes)")
+    elif sales >= 500:
+        reasons.append(f"Demanda aceptable ({sales:,}/mes)")
+
     if roi >= 25:
         reasons.append(f"ROI excelente ({roi}%)")
+    elif roi >= 20:
+        reasons.append(f"Buen ROI ({roi}%)")
+
     if profit >= 5:
-        reasons.append(f"Ganancia alta (${profit:.2f})")
-    if sales >= 10000:
-        reasons.append(f"Alta demanda ({sales:,}/mes)")
-    elif sales >= 3000:
-        reasons.append(f"Buena demanda ({sales:,}/mes)")
+        reasons.append(f"Ganancia alta (${profit:.2f}/unidad)")
+
     if sellers <= 3:
         reasons.append("Poca competencia")
+
     if is_amazon:
         reasons.append("CUIDADO: Amazon vende este producto")
+
+    if sales < 500:
+        reasons.append("ALERTA: Ventas bajas - producto lento")
+
     return reasons
 
 
