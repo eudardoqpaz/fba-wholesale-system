@@ -172,6 +172,44 @@ async def product_finder(query: FinderQuery):
     return results
 
 
+# ─── Smart Discovery ───
+
+class SmartDiscoveryQuery(BaseModel):
+    root_category: Optional[int] = None
+    min_price: float = 15
+    max_price: float = 100
+    max_bsr: int = 50000
+    max_fba_sellers: int = 15
+    min_monthly_sales: int = 30
+    min_reviews: int = 50
+    exclude_amazon: bool = True
+    sort_by: str = "bsr"
+    max_results: int = 50
+    verify_eligibility: bool = True
+
+
+@router.post("/api/smart-discovery")
+async def smart_discovery(query: SmartDiscoveryQuery):
+    """
+    Smart Discovery: Search Keepa and filter by SP-API eligibility.
+    Only returns products you can actually sell.
+    """
+    results = await scanner.smart_discovery(
+        root_category=query.root_category,
+        min_price=query.min_price,
+        max_price=query.max_price,
+        max_bsr=query.max_bsr,
+        max_fba_sellers=query.max_fba_sellers,
+        min_monthly_sales=query.min_monthly_sales,
+        min_reviews=query.min_reviews,
+        exclude_amazon=query.exclude_amazon,
+        sort_by=query.sort_by,
+        max_results=query.max_results,
+        verify_eligibility=query.verify_eligibility,
+    )
+    return results
+
+
 # ─── Best Sellers Explorer ───
 
 @router.get("/api/bestsellers/{category}")

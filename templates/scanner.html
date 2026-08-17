@@ -11,6 +11,11 @@
         </button>
     </li>
     <li class="nav-item">
+        <button class="nav-link" data-bs-tab="smart">
+            <i class="bi bi-stars"></i> Smart Discovery
+        </button>
+    </li>
+    <li class="nav-item">
         <button class="nav-link" data-bs-tab="csv">
             <i class="bi bi-upload"></i> Escanear CSV
         </button>
@@ -140,6 +145,93 @@
                         <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Links Directos para Comprar</h6>
                     </div>
                     <div class="card-body" id="store-links-body"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SMART DISCOVERY TAB -->
+    <div class="tab-pane fade" id="tab-smart">
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-stars"></i> Smart Discovery</h6>
+                    </div>
+                    <div class="card-body">
+                        <p class="text-muted small mb-3">
+                            Busca productos en Keepa y verifica automaticamente cuales puedes vender via SP-API.
+                        </p>
+                        <div class="mb-3">
+                            <label class="form-label">Categoria</label>
+                            <select class="form-select form-select-sm" id="smart-category">
+                                <option value="">Todas las categorias</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Precio Min ($)</label>
+                                <input type="number" class="form-control form-control-sm" id="smart-min-price" value="15">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Precio Max ($)</label>
+                                <input type="number" class="form-control form-control-sm" id="smart-max-price" value="100">
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-6">
+                                <label class="form-label small">BSR Max</label>
+                                <input type="number" class="form-control form-control-sm" id="smart-max-bsr" value="50000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Max Sellers FBA</label>
+                                <input type="number" class="form-control form-control-sm" id="smart-max-sellers" value="15">
+                            </div>
+                        </div>
+                        <div class="row g-2 mt-1">
+                            <div class="col-6">
+                                <label class="form-label small">Ventas Min/mes</label>
+                                <input type="number" class="form-control form-control-sm" id="smart-min-sales" value="30">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Max Resultados</label>
+                                <input type="number" class="form-control form-control-sm" id="smart-max-results" value="30">
+                            </div>
+                        </div>
+                        <div class="form-check mt-3">
+                            <input class="form-check-input" type="checkbox" id="smart-verify" checked>
+                            <label class="form-check-label small" for="smart-verify">
+                                Verificar restricciones via SP-API
+                            </label>
+                        </div>
+                        <button class="btn btn-warning w-100 mt-3" id="smart-btn" onclick="runSmartDiscovery()">
+                            <i class="bi bi-stars"></i> BUSCAR PRODUCTOS VENDIBLES
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">Productos que Puedes Vender</h6>
+                        <span id="smart-count" class="badge bg-success" style="display:none;"></span>
+                    </div>
+                    <div class="card-body" id="smart-results">
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-stars" style="font-size:2rem;"></i><br>
+                            Busca productos - solo se mostraran los que puedes vender
+                        </div>
+                    </div>
+                </div>
+                <!-- Restricted products -->
+                <div class="card mt-3" id="smart-restricted-card" style="display:none;">
+                    <div class="card-header">
+                        <h6 class="mb-0 text-danger"><i class="bi bi-x-circle"></i> Productos Restringidos (no puedes vender)</h6>
+                    </div>
+                    <div class="card-body" id="smart-restricted-results"></div>
                 </div>
             </div>
         </div>
@@ -279,6 +371,105 @@ async function runFinder() {
     } finally {
         btn.disabled = false;
         btn.innerHTML = '<i class="bi bi-search"></i> BUSCAR PRODUCTOS';
+    }
+}
+
+// ─── Smart Discovery ───
+async function runSmartDiscovery() {
+    const btn = document.getElementById('smart-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Buscando y verificando...';
+
+    const data = {
+        root_category: parseInt(document.getElementById('smart-category').value) || null,
+        min_price: parseFloat(document.getElementById('smart-min-price').value),
+        max_price: parseFloat(document.getElementById('smart-max-price').value),
+        max_bsr: parseInt(document.getElementById('smart-max-bsr').value),
+        max_fba_sellers: parseInt(document.getElementById('smart-max-sellers').value),
+        min_monthly_sales: parseInt(document.getElementById('smart-min-sales').value),
+        min_reviews: 0,
+        exclude_amazon: true,
+        sort_by: "bsr",
+        max_results: parseInt(document.getElementById('smart-max-results').value),
+        verify_eligibility: document.getElementById('smart-verify').checked,
+    };
+
+    try {
+        const resp = await fetch('/scanner/api/smart-discovery', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+
+        if (result.error) {
+            document.getElementById('smart-results').innerHTML = `<div class="alert alert-danger">${result.error}</div>`;
+        } else {
+            renderSmartResults(result);
+        }
+    } catch (err) {
+        document.getElementById('smart-results').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-stars"></i> BUSCAR PRODUCTOS VENDIBLES';
+    }
+}
+
+function renderSmartResults(data) {
+    const container = document.getElementById('smart-results');
+    const count = document.getElementById('smart-count');
+    const restrictedCard = document.getElementById('smart-restricted-card');
+    const restrictedContainer = document.getElementById('smart-restricted-results');
+
+    // Show eligible count
+    count.style.display = 'inline';
+    count.textContent = `${data.eligible_count || 0} puedes vender`;
+
+    // Show eligible products
+    if (!data.products || data.products.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No se encontraron productos que puedas vender.</div>';
+    } else {
+        let html = `<div class="mb-2 small text-muted">
+            ${data.total_found || 0} encontrados en Keepa → 
+            ${data.verified || 0} verificados via SP-API → 
+            <strong class="text-success">${data.eligible_count || 0} puedes vender</strong>
+        </div>`;
+        html += '<div class="table-responsive"><table class="table table-hover table-sm"><thead><tr>';
+        html += '<th>ASIN</th><th>Producto</th><th>Precio</th><th>BSR</th><th>Sellers</th><th>Sales/mo</th><th>Estado</th></tr></thead><tbody>';
+
+        data.products.forEach(p => {
+            const calc = p.calc || {};
+            const eligibility = p.eligibility === 'approved' ? '<span class="badge bg-success">OK</span>' : 
+                               p.eligibility === 'unknown' ? '<span class="badge bg-warning">?</span>' : 
+                               '<span class="badge bg-secondary">-</span>';
+            html += `<tr>
+                <td><a href="https://www.amazon.com/dp/${p.asin}" target="_blank" class="text-warning">${p.asin}</a></td>
+                <td class="small">${(p.title || '').substring(0, 45)}</td>
+                <td>$${(p.sell_price || 0).toFixed(2)}</td>
+                <td>${(p.bsr || 0).toLocaleString()}</td>
+                <td>${p.fba_seller_count || 0}</td>
+                <td>${(p.monthly_sales_est || 0).toLocaleString()}</td>
+                <td>${eligibility}</td>
+            </tr>`;
+        });
+
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    }
+
+    // Show restricted products
+    if (data.restricted && data.restricted.length > 0) {
+        restrictedCard.style.display = 'block';
+        let rhtml = `<p class="small text-muted mb-2">${data.restricted.length} productos que NO puedes vender:</p>`;
+        data.restricted.forEach(p => {
+            rhtml += `<div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                <span class="small"><code>${p.asin}</code> ${(p.title || '').substring(0, 40)}</span>
+                <span class="badge bg-danger">${p.restriction_reason || 'Restringido'}</span>
+            </div>`;
+        });
+        restrictedContainer.innerHTML = rhtml;
+    } else {
+        restrictedCard.style.display = 'none';
     }
 }
 

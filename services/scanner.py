@@ -134,6 +134,106 @@ class ProductScanner:
             "tokens_used": finder_result.get("tokens_consumed", 0),
         }
 
+    async def smart_discovery(
+        self,
+        root_category: int = None,
+        min_price: float = 15,
+        max_price: float = 100,
+        max_bsr: int = 50000,
+        max_fba_sellers: int = 15,
+        min_monthly_sales: int = 30,
+        min_reviews: int = 50,
+        exclude_amazon: bool = True,
+        sort_by: str = "bsr",
+        max_results: int = 50,
+        verify_eligibility: bool = True,
+    ) -> dict:
+        """
+        Smart Discovery: Search Keepa for products and filter by SP-API eligibility.
+        Only returns products the seller can actually list.
+        """
+        # Step 1: Search Keepa
+        finder_result = await self.search_keepa_finder(
+            root_category=root_category,
+            min_price=min_price,
+            max_price=max_price,
+            max_bsr=max_bsr,
+            max_fba_sellers=max_fba_sellers,
+            min_monthly_sales=min_monthly_sales,
+            min_reviews=min_reviews,
+            exclude_amazon=exclude_amazon,
+            sort_by=sort_by,
+            max_results=max_results,
+        )
+
+        if finder_result.get("error"):
+            return finder_result
+
+        products = finder_result.get("products", [])
+        if not products:
+            return {"products": [], "total_found": 0, "verified": 0, "restricted": 0}
+
+        # Step 2: Verify eligibility via SP-API
+        eligible_products = []
+        restricted_products = []
+        verification_errors = []
+
+        if verify_eligibility:
+            from services.amazon_api import amazon_api
+            from services.eligibility import eligibility_service
+
+            if amazon_api.is_configured:
+                # Real SP-API check
+                for p in products:
+                    asin = p.get("asin")
+                    if not asin:
+                        continue
+
+                    restriction = await amazon_api.check_restriction_for_asin(asin)
+
+                    if restriction.get("restricted") is True:
+                        p["restriction_reason"] = restriction.get("reason", "Restricted")
+                        restricted_products.append(p)
+                    elif restriction.get("restricted") is False:
+                        p["eligibility"] = "approved"
+                        eligible_products.append(p)
+                    else:
+                        # Can't determine - include with warning
+                        p["eligibility"] = "unknown"
+                        p["eligibility_warning"] = restriction.get("reason", "Could not verify")
+                        eligible_products.append(p)
+
+                    await asyncio.sleep(0.3)  # Rate limiting
+            else:
+                # Fallback: use local category filtering
+                for p in products:
+                    cat_id = eligibility_service.categorize_product(p)
+                    p["_category_id"] = cat_id
+                    # We can't verify without SP-API, include all
+                    p["eligibility"] = "unverified"
+                    eligible_products.append(p)
+        else:
+            eligible_products = products
+
+        # Calculate profitability for eligible products
+        analyzed = []
+        for p in eligible_products:
+            calc = ProfitCalculator.from_keepa_product(p, buy_price=0)
+            p["calc"] = calc
+            analyzed.append(p)
+
+        analyzed.sort(key=lambda x: x.get("calc", {}).get("roi_pct", 0), reverse=True)
+
+        return {
+            "products": analyzed,
+            "restricted": restricted_products,
+            "total_found": finder_result.get("total_found", 0),
+            "verified": len(eligible_products) + len(restricted_products),
+            "eligible_count": len(eligible_products),
+            "restricted_count": len(restricted_products),
+            "tokens_used": finder_result.get("tokens_used", 0),
+        }
+
     async def get_category_best_sellers(self, category: str | int, limit: int = 50) -> dict:
         """Get best sellers for a category and analyze them."""
         bs = await keepa_service.get_best_sellers(category)
