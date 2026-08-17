@@ -79,10 +79,10 @@ VENTAJAS PARA WHOLESALE:
 - Ofertas flash online con descuentos grandes""",
         "tips": [
             "Usa la app de Sam's Club para escanear precios mientras caminas por la tienda",
-            "Los "Instant Savings" son las mejores oportunidades",
-            "Productos de marca Member's Mark no se pueden revender en Amazon",
+            "Los Instant Savings son las mejores oportunidades",
+            "Productos de marca Members Mark no se pueden revender en Amazon",
             "Busca productos con precio unitario bajo comparado con Amazon",
-            "Revisa la seccion de "Clearance" en la tienda",
+            "Revisa la seccion de Clearance en la tienda",
         ],
     },
     "bjs": {

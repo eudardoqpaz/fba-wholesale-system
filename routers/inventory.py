@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from database import get_db
 from models import InventoryItem, Product, PurchaseOrder, PurchaseOrderItem, Supplier
+from services.amazon_api import amazon_api
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, timezone
@@ -227,3 +228,125 @@ async def check_reorder(db: AsyncSession = Depends(get_db)):
         "total_items": len(reorder_needed),
         "estimated_total_cost": sum(r["estimated_cost"] for r in reorder_needed),
     }
+
+
+# ─── Amazon FBA Inventory via SP-API ───
+
+@router.get("/api/amazon/list")
+async def list_amazon_inventory():
+    """Get FBA inventory directly from Amazon via SP-API."""
+    if not amazon_api.is_configured:
+        return {
+            "status": "error",
+            "message": "SP-API not configured. Add credentials in Settings.",
+            "items": [],
+        }
+
+    result = await amazon_api.get_all_inventory()
+    return result
+
+
+@router.post("/api/amazon/sync")
+async def sync_amazon_inventory(db: AsyncSession = Depends(get_db)):
+    """
+    Sync FBA inventory from Amazon to local database.
+    Updates quantity_fba for products that exist locally.
+    """
+    if not amazon_api.is_configured:
+        return {"status": "error", "message": "SP-API not configured"}
+
+    amazon_inv = await amazon_api.get_all_inventory()
+    if amazon_inv.get("error"):
+        return {"status": "error", "message": amazon_inv["error"]}
+
+    synced = 0
+    not_found = 0
+    created = 0
+
+    for item in amazon_inv.get("items", []):
+        asin = item.get("asin")
+        if not asin:
+            continue
+
+        # Find product locally
+        result = await db.execute(select(Product).where(Product.asin == asin))
+        product = result.scalar_one_or_none()
+
+        if not product:
+            not_found += 1
+            continue
+
+        # Find or create inventory record
+        inv_result = await db.execute(
+            select(InventoryItem).where(InventoryItem.product_id == product.id)
+        )
+        inv_item = inv_result.scalar_one_or_none()
+
+        if not inv_item:
+            inv_item = InventoryItem(product_id=product.id)
+            db.add(inv_item)
+            created += 1
+
+        # Update quantities from Amazon
+        inv_item.quantity_fba = item.get("fulfillable_quantity", 0)
+        inv_item.quantity_inbound = item.get("inbound_quantity", 0)
+
+        # Update status
+        if inv_item.quantity_fba <= 0:
+            inv_item.status = "out_of_stock"
+        elif inv_item.quantity_fba <= inv_item.reorder_point:
+            inv_item.status = "low_stock"
+        else:
+            inv_item.status = "in_stock"
+
+        synced += 1
+
+    await db.commit()
+
+    return {
+        "status": "ok",
+        "synced": synced,
+        "created": created,
+        "not_found_locally": not_found,
+        "total_amazon_items": len(amazon_inv.get("items", [])),
+    }
+
+
+class PriceUpdate(BaseModel):
+    sku: str
+    price: float
+
+
+class BatchPriceUpdate(BaseModel):
+    updates: list[PriceUpdate]
+
+
+@router.post("/api/amazon/update-price")
+async def update_amazon_price(data: PriceUpdate):
+    """Update price for a single listing on Amazon."""
+    if not amazon_api.is_configured:
+        return {"status": "error", "message": "SP-API not configured"}
+
+    result = await amazon_api.update_listing_price(data.sku, data.price)
+    return result
+
+
+@router.post("/api/amazon/batch-update-prices")
+async def batch_update_amazon_prices(data: BatchPriceUpdate):
+    """Batch update prices for multiple listings on Amazon."""
+    if not amazon_api.is_configured:
+        return {"status": "error", "message": "SP-API not configured"}
+
+    updates = [{"sku": u.sku, "price": u.price} for u in data.updates]
+    result = await amazon_api.batch_update_prices(updates)
+    return result
+
+
+@router.get("/api/amazon/listing/{sku}")
+async def get_amazon_listing(sku: str):
+    """Get listing details from Amazon by SKU."""
+    if not amazon_api.is_configured:
+        return {"status": "error", "message": "SP-API not configured"}
+
+    result = await amazon_api.get_listing_details(sku)
+    return result

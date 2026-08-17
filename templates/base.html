@@ -68,6 +68,11 @@
                     <i class="bi bi-gear"></i> Categorias
                 </a>
             </li>
+            <li class="nav-item">
+                <a class="nav-link {% if '/approvals' in request.url.path %}active{% endif %}" href="/approvals">
+                    <i class="bi bi-patch-check"></i> Aprobaciones
+                </a>
+            </li>
         </ul>
         <div class="sidebar-footer">
             <small class="text-muted">Sterling, VA</small>

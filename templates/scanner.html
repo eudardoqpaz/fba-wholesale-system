@@ -168,6 +168,12 @@
                                     <input type="number" class="form-control form-control-sm" id="scan-min-profit" value="2.50" step="0.50">
                                 </div>
                             </div>
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox" id="scan-check-restrictions">
+                                <label class="form-check-label small" for="scan-check-restrictions">
+                                    Verificar restricciones via SP-API
+                                </label>
+                            </div>
                             <button type="submit" class="btn btn-warning w-100 mt-3" id="scan-btn">
                                 <i class="bi bi-upload"></i> ESCANEAR CSV
                             </button>
@@ -529,6 +535,7 @@ document.getElementById('scan-form').addEventListener('submit', async (e) => {
     formData.append('file', file);
     formData.append('min_roi', document.getElementById('scan-min-roi').value);
     formData.append('min_profit', document.getElementById('scan-min-profit').value);
+    formData.append('check_restrictions', document.getElementById('scan-check-restrictions').checked);
 
     const btn = document.getElementById('scan-btn');
     btn.disabled = true;
@@ -560,6 +567,16 @@ function renderScanResults(data) {
             <div class="col-3"><div class="text-center p-2 bg-danger bg-opacity-10 rounded"><h5 class="text-danger mb-0">${s.not_profitable_count}</h5><small>No rent.</small></div></div>
             <div class="col-3"><div class="text-center p-2 bg-info bg-opacity-10 rounded"><h5 class="text-info mb-0">${s.avg_roi}%</h5><small>ROI Prom</small></div></div>
         </div>
+    `;
+
+    // Show restricted products if any
+    if (data.restricted && data.restricted.length > 0) {
+        html += `<div class="alert alert-danger small mb-2">
+            <strong>${data.restricted.length} productos restringidos</strong> (excluidos del analisis)
+        </div>`;
+    }
+
+    html += `
         <button class="btn btn-sm btn-warning w-100 mb-3" onclick="aiSelectProducts()">
             <i class="bi bi-robot"></i> IA ELIGE LOS MEJORES
         </button>

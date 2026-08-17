@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Aprobaciones de Marca - FBA System{% endblock %}
+{% block page_title %}Aprobaciones de Marca{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Stats -->
+    <div class="col-12">
+        <div class="row g-2">
+            <div class="col">
+                <div class="card text-center p-2">
+                    <h4 class="mb-0">{{ stats.total }}</h4>
+                    <small class="text-muted">Total</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center p-2">
+                    <h4 class="text-warning mb-0">{{ stats.pending }}</h4>
+                    <small class="text-muted">Pendientes</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center p-2">
+                    <h4 class="text-info mb-0">{{ stats.submitted }}</h4>
+                    <small class="text-muted">Enviadas</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center p-2">
+                    <h4 class="text-success mb-0">{{ stats.approved }}</h4>
+                    <small class="text-muted">Aprobadas</small>
+                </div>
+            </div>
+            <div class="col">
+                <div class="card text-center p-2">
+                    <h4 class="text-danger mb-0">{{ stats.rejected }}</h4>
+                    <small class="text-muted">Rechazadas</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-plus-circle"></i> Nueva Aprobacion</h6>
+            </div>
+            <div class="card-body">
+                <form id="add-approval-form">
+                    <div class="mb-2">
+                        <label class="form-label small">Marca</label>
+                        <input type="text" class="form-control form-control-sm" id="brand-name" 
+                               placeholder="Ej: OWALA" required>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Categoria</label>
+                        <input type="text" class="form-control form-control-sm" id="brand-category" 
+                               placeholder="Ej: Kitchen, Beauty...">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Prioridad</label>
+                        <select class="form-select form-select-sm" id="brand-priority">
+                            <option value="low">Baja</option>
+                            <option value="medium" selected>Media</option>
+                            <option value="high">Alta</option>
+                        </select>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Requisitos de Amazon</label>
+                        <textarea class="form-control form-control-sm" id="brand-requirements" rows="3"
+                                  placeholder="Pega aqui lo que Amazon pide..."></textarea>
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">URL de solicitud</label>
+                        <input type="text" class="form-control form-control-sm" id="brand-url" 
+                               placeholder="Link de Amazon">
+                    </div>
+                    <div class="mb-2">
+                        <label class="form-label small">Notas</label>
+                        <input type="text" class="form-control form-control-sm" id="brand-notes" 
+                               placeholder="Notas adicionales">
+                    </div>
+                    <button type="submit" class="btn btn-warning w-100">
+                        <i class="bi bi-plus"></i> AGREGAR
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- List -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-list-check"></i> Marcas en Seguimiento</h6>
+                <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary active" onclick="filterApprovals('all')">Todas</button>
+                    <button class="btn btn-outline-warning" onclick="filterApprovals('pending')">Pendientes</button>
+                    <button class="btn btn-outline-info" onclick="filterApprovals('submitted')">Enviadas</button>
+                    <button class="btn btn-outline-success" onclick="filterApprovals('approved')">Aprobadas</button>
+                </div>
+            </div>
+            <div class="card-body p-0">
+                <div id="approvals-list">
+                    {% for a in approvals %}
+                    <div class="p-3 border-bottom approval-item" data-status="{{ a.status }}" data-id="{{ a.id }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <h6 class="mb-1">
+                                    {% if a.priority == 'high' %}
+                                    <span class="badge bg-danger me-1">!</span>
+                                    {% elif a.priority == 'medium' %}
+                                    <span class="badge bg-warning me-1">!</span>
+                                    {% endif %}
+                                    {{ a.brand_name }}
+                                    {% if a.category %}
+                                    <span class="badge bg-secondary ms-1">{{ a.category }}</span>
+                                    {% endif %}
+                                </h6>
+                                {% if a.requirements %}
+                                <p class="text-muted small mb-1">{{ a.requirements[:150] }}{% if a.requirements|length > 150 %}...{% endif %}</p>
+                                {% endif %}
+                                <div class="d-flex gap-2 align-items-center">
+                                    {% if a.status == 'pending' %}
+                                    <span class="badge bg-warning">Pendiente</span>
+                                    {% elif a.status == 'submitted' %}
+                                    <span class="badge bg-info">Enviada</span>
+                                    {% elif a.status == 'approved' %}
+                                    <span class="badge bg-success">Aprobada</span>
+                                    {% elif a.status == 'rejected' %}
+                                    <span class="badge bg-danger">Rechazada</span>
+                                    {% endif %}
+
+                                    {% if a.invoice_sent %}
+                                    <span class="badge bg-success"><i class="bi bi-check"></i> Factura enviada</span>
+                                    {% else %}
+                                    <span class="badge bg-secondary">Sin factura</span>
+                                    {% endif %}
+
+                                    {% if a.invoice_units %}
+                                    <span class="small text-muted">{{ a.invoice_units }} unidades</span>
+                                    {% endif %}
+
+                                    {% if a.submitted_at %}
+                                    <span class="small text-muted">Enviada: {{ a.submitted_at.strftime('%Y-%m-%d') }}</span>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <div class="btn-group btn-group-sm">
+                                {% if a.status == 'pending' %}
+                                <button class="btn btn-outline-info btn-sm" onclick="markSubmitted({{ a.id }})" title="Marcar como enviada">
+                                    <i class="bi bi-send"></i>
+                                </button>
+                                {% elif a.status == 'submitted' %}
+                                <button class="btn btn-outline-success btn-sm" onclick="markApproved({{ a.id }})" title="Marcar como aprobada">
+                                    <i class="bi bi-check"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="markRejected({{ a.id }})" title="Marcar como rechazada">
+                                    <i class="bi bi-x"></i>
+                                </button>
+                                {% endif %}
+                                <button class="btn btn-outline-secondary btn-sm" onclick="editApproval({{ a.id }})" title="Editar">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button class="btn btn-outline-danger btn-sm" onclick="deleteApproval({{ a.id }}, '{{ a.brand_name }}')" title="Eliminar">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </div>
+                        {% if a.notes %}
+                        <small class="text-muted d-block mt-1"><i class="bi bi-sticky"></i> {{ a.notes }}</small>
+                        {% endif %}
+                    </div>
+                    {% endfor %}
+                    {% if not approvals %}
+                    <div class="p-4 text-center text-muted">
+                        <i class="bi bi-inbox" style="font-size:2rem;"></i>
+                        <p class="mt-2">No hay aprobaciones en seguimiento</p>
+                        <p class="small">Agrega una marca usando el formulario de la izquierda</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Add new approval
+document.getElementById('add-approval-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    
+    const data = {
+        brand_name: document.getElementById('brand-name').value,
+        category: document.getElementById('brand-category').value,
+        priority: document.getElementById('brand-priority').value,
+        requirements: document.getElementById('brand-requirements').value,
+        amazon_request_url: document.getElementById('brand-url').value,
+        notes: document.getElementById('brand-notes').value,
+    };
+
+    try {
+        const resp = await fetch('/approvals/api/create', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+        if (result.status === 'ok') {
+            location.reload();
+        } else {
+            alert('Error: ' + (result.detail || 'Unknown error'));
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+});
+
+// Filter by status
+function filterApprovals(status) {
+    const items = document.querySelectorAll('.approval-item');
+    const buttons = document.querySelectorAll('.btn-group .btn');
+    
+    buttons.forEach(b => b.classList.remove('active'));
+    event.target.classList.add('active');
+
+    items.forEach(item => {
+        if (status === 'all' || item.dataset.status === status) {
+            item.style.display = 'block';
+        } else {
+            item.style.display = 'none';
+        }
+    });
+}
+
+// Mark as submitted
+async function markSubmitted(id) {
+    if (!confirm('Marcar como enviada a Amazon?')) return;
+    try {
+        await fetch(`/approvals/api/${id}/submit`, {method: 'POST'});
+        location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// Mark as approved
+async function markApproved(id) {
+    if (!confirm('Marcar como APROBADA por Amazon?')) return;
+    try {
+        await fetch(`/approvals/api/${id}/approve`, {method: 'POST'});
+        location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// Mark as rejected
+async function markRejected(id) {
+    if (!confirm('Marcar como RECHAZADA por Amazon?')) return;
+    try {
+        await fetch(`/approvals/api/${id}/reject`, {method: 'POST'});
+        location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// Edit approval
+async function editApproval(id) {
+    const notes = prompt('Notas adicionales:');
+    if (notes === null) return;
+    
+    try {
+        await fetch(`/approvals/api/${id}`, {
+            method: 'PUT',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({notes: notes}),
+        });
+        location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
+// Delete approval
+async function deleteApproval(id, brand) {
+    if (!confirm(`Eliminar el seguimiento de ${brand}?`)) return;
+    try {
+        await fetch(`/approvals/api/${id}`, {method: 'DELETE'});
+        location.reload();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+</script>
+{% endblock %}

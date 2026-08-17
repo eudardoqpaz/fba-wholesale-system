@@ -117,6 +117,7 @@ async def scan_price_list(
     max_sellers: int = Form(25),
     max_bsr: int = Form(100000),
     keep_amazon_sellers: bool = Form(False),
+    check_restrictions: bool = Form(False),
     db: AsyncSession = Depends(get_db),
 ):
     """Upload CSV and scan against Amazon data."""
@@ -133,7 +134,7 @@ async def scan_price_list(
     if not price_list:
         raise HTTPException(400, "No valid products found. CSV needs ASIN and Cost columns.")
 
-    results = await scanner.scan_price_list(price_list, min_roi, min_profit, max_sellers, max_bsr, keep_amazon_sellers)
+    results = await scanner.scan_price_list(price_list, min_roi, min_profit, max_sellers, max_bsr, keep_amazon_sellers, check_restrictions)
 
     scan_record = ScanResult(
         scan_name=file.filename,

@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from database import init_db
 from config import settings
-from routers import dashboard, products, scanner, inventory, suppliers, ai_chat, scraper, discovery, settings
+from routers import dashboard, products, scanner, inventory, suppliers, ai_chat, scraper, discovery, settings, approvals
 
 
 @asynccontextmanager
@@ -39,6 +39,7 @@ app.include_router(ai_chat.router, prefix="/ai", tags=["AI Advisor"])
 app.include_router(scraper.router, prefix="/stores", tags=["Store Scraper"])
 app.include_router(discovery.router, prefix="/discover", tags=["Auto Discovery"])
 app.include_router(settings.router, prefix="/settings", tags=["Settings"])
+app.include_router(approvals.router, prefix="/approvals", tags=["Brand Approvals"])
 
 
 @app.get("/health")

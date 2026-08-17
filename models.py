@@ -219,3 +219,26 @@ class Setting(Base):
     key = Column(String(100), unique=True, nullable=False)
     value = Column(Text, default="")
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+
+class BrandApproval(Base):
+    __tablename__ = "brand_approvals"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    brand_name = Column(String(200), nullable=False)
+    category = Column(String(100), default="")
+    status = Column(String(30), default="pending")  # pending, submitted, approved, rejected
+    amazon_request_url = Column(Text, default="")
+    requirements = Column(Text, default="")  # What Amazon requires
+    invoice_sent = Column(Boolean, default=False)
+    invoice_date = Column(DateTime, default=None)
+    invoice_supplier = Column(String(200), default="")
+    invoice_units = Column(Integer, default=0)
+    contact_email = Column(String(200), default="")
+    contact_phone = Column(String(50), default="")
+    submitted_at = Column(DateTime, default=None)
+    resolved_at = Column(DateTime, default=None)
+    notes = Column(Text, default="")
+    priority = Column(String(20), default="medium")  # low, medium, high
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

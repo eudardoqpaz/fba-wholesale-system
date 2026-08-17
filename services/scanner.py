@@ -19,6 +19,7 @@ class ProductScanner:
         max_sellers: int = 25,
         max_bsr: int = 100000,
         keep_amazon_sellers: bool = False,
+        check_restrictions: bool = False,
     ) -> dict:
         """Scan a supplier price list against Amazon data from Keepa."""
         asins = [p["asin"] for p in price_list if p.get("asin")]
@@ -28,7 +29,16 @@ class ProductScanner:
             if pd and pd.get("asin"):
                 keepa_data[pd["asin"]] = pd
 
-        return self._analyze(price_list, keepa_data, min_roi, min_profit, max_sellers, max_bsr, keep_amazon_sellers)
+        # Optionally check SP-API restrictions
+        restriction_data = {}
+        if check_restrictions:
+            from services.amazon_api import amazon_api
+            if amazon_api.is_configured:
+                for asin in asins[:20]:
+                    restriction_data[asin] = await amazon_api.check_restriction_for_asin(asin)
+                    await asyncio.sleep(0.3)
+
+        return self._analyze(price_list, keepa_data, min_roi, min_profit, max_sellers, max_bsr, keep_amazon_sellers, restriction_data)
 
     async def search_keepa_finder(
         self,
@@ -161,14 +171,26 @@ class ProductScanner:
                 products.append({"asin": asin.upper(), "supplier_cost": cost, "supplier_sku": sku})
         return products
 
-    def _analyze(self, price_list, keepa_data, min_roi, min_profit, max_sellers, max_bsr, keep_amazon_sellers):
+    def _analyze(self, price_list, keepa_data, min_roi, min_profit, max_sellers, max_bsr, keep_amazon_sellers, restriction_data=None):
         """Analyze price list against Keepa data."""
+        restriction_data = restriction_data or {}
         results = {
             "profitable": [],
             "marginal": [],
             "not_profitable": [],
+            "restricted": [],
             "errors": [],
-            "stats": {"total_scanned": len(price_list), "profitable_count": 0, "marginal_count": 0, "not_profitable_count": 0, "error_count": 0, "avg_roi": 0, "avg_profit": 0, "best_roi": 0},
+            "stats": {
+                "total_scanned": len(price_list),
+                "profitable_count": 0,
+                "marginal_count": 0,
+                "not_profitable_count": 0,
+                "restricted_count": 0,
+                "error_count": 0,
+                "avg_roi": 0,
+                "avg_profit": 0,
+                "best_roi": 0,
+            },
         }
 
         roi_sum = profit_sum = valid = 0
@@ -183,6 +205,21 @@ class ProductScanner:
                 continue
             if cost <= 0:
                 results["errors"].append({"asin": asin, "error": "No cost"})
+                continue
+
+            # Check SP-API restrictions first
+            restriction = restriction_data.get(asin)
+            if restriction and restriction.get("restricted") is True:
+                entry = {
+                    "asin": asin,
+                    "title": kd.get("title", ""),
+                    "brand": kd.get("brand", ""),
+                    "supplier_cost": cost,
+                    "amazon_price": kd.get("sell_price", 0),
+                    "restriction_reason": restriction.get("reason", "Restricted"),
+                }
+                results["restricted"].append(entry)
+                results["stats"]["restricted_count"] += 1
                 continue
 
             # Filters
@@ -216,6 +253,7 @@ class ProductScanner:
                 "review_count": kd.get("review_count", 0),
                 "rating": kd.get("rating", 0),
                 "fba_fee": kd.get("fba_fee", 0),
+                "restriction_status": "ok" if not restriction else ("unknown" if restriction.get("restricted") is None else "ok"),
                 **calc,
             }
 
