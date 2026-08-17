@@ -6,17 +6,17 @@
 <!-- Tabs -->
 <ul class="nav nav-tabs mb-4" role="tablist">
     <li class="nav-item">
-        <button class="nav-link active" data-bs-toggle="tab" data-bs-tab="finder">
+        <button class="nav-link active" data-bs-tab="finder">
             <i class="bi bi-search"></i> Product Finder (Keepa)
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-tab="csv">
+        <button class="nav-link" data-bs-tab="csv">
             <i class="bi bi-upload"></i> Escanear CSV
         </button>
     </li>
     <li class="nav-item">
-        <button class="nav-link" data-bs-toggle="tab" data-bs-tab="bestsellers">
+        <button class="nav-link" data-bs-tab="bestsellers">
             <i class="bi bi-trophy"></i> Best Sellers
         </button>
     </li>
@@ -26,7 +26,7 @@
     <!-- PRODUCT FINDER TAB -->
     <div class="tab-pane fade show active" id="tab-finder">
         <div class="row g-3">
-            <div class="col-lg-5">
+            <div class="col-lg-4">
                 <div class="card">
                     <div class="card-header"><h6 class="mb-0">Buscar Productos en Keepa</h6></div>
                     <div class="card-body">
@@ -46,32 +46,19 @@
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Precio Max ($)</label>
-                                <input type="number" class="form-control form-control-sm" id="finder-max-price" value="100">
+                                <input type="number" class="form-control form-control-sm" id="finder-max-price" value="75">
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Max BSR</label>
-                                <input type="number" class="form-control form-control-sm" id="finder-max-bsr" value="50000">
+                                <input type="number" class="form-control form-control-sm" id="finder-max-bsr" value="30000">
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Max Sellers FBA</label>
-                                <input type="number" class="form-control form-control-sm" id="finder-max-sellers" value="15">
+                                <input type="number" class="form-control form-control-sm" id="finder-max-sellers" value="12">
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Min Monthly Sales</label>
-                                <input type="number" class="form-control form-control-sm" id="finder-min-sales" value="30">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small">Min Reviews</label>
-                                <input type="number" class="form-control form-control-sm" id="finder-min-reviews" value="50">
-                            </div>
-                            <div class="col-6">
-                                <label class="form-label small">Ordenar por</label>
-                                <select class="form-select form-select-sm" id="finder-sort">
-                                    <option value="bsr">Menor BSR</option>
-                                    <option value="sales">Mas Vendidos</option>
-                                    <option value="price_low">Menor Precio</option>
-                                    <option value="reviews">Mas Reviews</option>
-                                </select>
+                                <input type="number" class="form-control form-control-sm" id="finder-min-sales" value="50">
                             </div>
                             <div class="col-6">
                                 <label class="form-label small">Max Resultados</label>
@@ -80,29 +67,79 @@
                         </div>
                         <div class="form-check mt-2">
                             <input class="form-check-input" type="checkbox" id="finder-exclude-amz" checked>
-                            <label class="form-check-label small">Excluir productos donde Amazon vende</label>
+                            <label class="form-check-label small">Excluir donde Amazon vende</label>
                         </div>
                         <button class="btn btn-warning w-100 mt-3" id="finder-btn" onclick="runFinder()">
                             <i class="bi bi-search"></i> BUSCAR PRODUCTOS
                         </button>
-                        <div class="small text-muted mt-2">
-                            <i class="bi bi-info-circle"></i> Token cost: ~11 tokens base + data. Starter plan (20 tok/min).
+                    </div>
+                </div>
+
+                <!-- AI Select Budget -->
+                <div class="card mt-3" id="ai-select-card" style="display:none;">
+                    <div class="card-header bg-warning text-dark">
+                        <h6 class="mb-0"><i class="bi bi-robot"></i> IA Selecciona los Mejores</h6>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-2">
+                            <label class="form-label small fw-bold">Presupuesto ($)</label>
+                            <input type="number" class="form-control form-control-sm" id="ai-budget" value="500">
                         </div>
+                        <button class="btn btn-dark w-100" onclick="aiSelectProducts()">
+                            <i class="bi bi-stars"></i> IA ELIGE LOS MEJORES
+                        </button>
                     </div>
                 </div>
             </div>
-            <div class="col-lg-7">
+
+            <div class="col-lg-8">
+                <!-- Results -->
                 <div class="card">
-                    <div class="card-header d-flex justify-content-between">
+                    <div class="card-header d-flex justify-content-between align-items-center">
                         <h6 class="mb-0">Resultados</h6>
-                        <span id="finder-count" class="badge bg-warning" style="display:none;"></span>
+                        <div>
+                            <span id="finder-count" class="badge bg-warning" style="display:none;"></span>
+                            <button id="export-btn" class="btn btn-sm btn-outline-success ms-2" style="display:none;" onclick="exportCSV()">
+                                <i class="bi bi-filetype-csv"></i> CSV
+                            </button>
+                            <button id="export-excel-btn" class="btn btn-sm btn-success ms-1" style="display:none;" onclick="exportExcel()">
+                                <i class="bi bi-file-earmark-excel"></i> Excel
+                            </button>
+                        </div>
                     </div>
                     <div class="card-body" id="finder-results">
                         <div class="text-center text-muted py-5">
                             <i class="bi bi-search" style="font-size:2rem;"></i><br>
-                            Configura los filtros y busca productos ganadores
+                            Configura los filtros y busca productos
                         </div>
                     </div>
+                </div>
+
+                <!-- AI Selected Products -->
+                <div class="card mt-3" id="ai-results-card" style="display:none;">
+                    <div class="card-header bg-success text-white d-flex justify-content-between">
+                        <h6 class="mb-0"><i class="bi bi-check-circle"></i> Productos Seleccionados por IA</h6>
+                        <div>
+                            <button class="btn btn-sm btn-light" onclick="exportAICSV()">
+                                <i class="bi bi-filetype-csv"></i> CSV
+                            </button>
+                            <button class="btn btn-sm btn-success ms-1" onclick="exportAIExcel()">
+                                <i class="bi bi-file-earmark-excel"></i> Excel
+                            </button>
+                            <button class="btn btn-sm btn-warning ms-1" onclick="searchInStores()">
+                                <i class="bi bi-shop"></i> Buscar en Tiendas
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-0" id="ai-results-body"></div>
+                </div>
+
+                <!-- Store Links -->
+                <div class="card mt-3" id="store-links-card" style="display:none;">
+                    <div class="card-header">
+                        <h6 class="mb-0"><i class="bi bi-link-45deg"></i> Links Directos para Comprar</h6>
+                    </div>
+                    <div class="card-body" id="store-links-body"></div>
                 </div>
             </div>
         </div>
@@ -120,15 +157,6 @@
                                 <label class="form-label">Archivo CSV</label>
                                 <input type="file" class="form-control" id="scan-file" accept=".csv" required>
                                 <div class="form-text">Columnas: ASIN, Cost (+ SKU opcional)</div>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">Proveedor</label>
-                                <select class="form-select" id="scan-supplier">
-                                    <option value="">-- Seleccionar --</option>
-                                    {% for s in suppliers %}
-                                    <option value="{{ s.id }}">{{ s.name }}</option>
-                                    {% endfor %}
-                                </select>
                             </div>
                             <div class="row g-2">
                                 <div class="col-6">
@@ -173,20 +201,15 @@
                                 {% endfor %}
                             </select>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label small">Limite de productos</label>
-                            <input type="number" class="form-control form-control-sm" id="bs-limit" value="30" max="100">
-                        </div>
                         <button class="btn btn-warning w-100" onclick="loadBestSellers()">
                             <i class="bi bi-trophy"></i> CARGAR BEST SELLERS
                         </button>
-                        <div class="small text-muted mt-2">Cost: 50 tokens</div>
                     </div>
                 </div>
             </div>
             <div class="col-lg-8">
                 <div class="card">
-                    <div class="card-header"><h6 class="mb-0">Top Productos por Categoria</h6></div>
+                    <div class="card-header"><h6 class="mb-0">Top Productos</h6></div>
                     <div class="card-body" id="bs-results">
                         <div class="text-center text-muted py-5">Selecciona una categoria</div>
                     </div>
@@ -195,30 +218,13 @@
         </div>
     </div>
 </div>
-
-<!-- Recent Scans -->
-<div class="card mt-3">
-    <div class="card-header"><h6 class="mb-0">Escaneos Recientes</h6></div>
-    <div class="card-body p-0">
-        <div class="list-group list-group-flush">
-            {% for scan in recent_scans %}
-            <div class="list-group-item d-flex justify-content-between align-items-center">
-                <div>
-                    <small class="fw-bold">{{ scan.scan_name }}</small>
-                    <small class="text-muted ms-2">{{ scan.total_products_scanned }} productos</small>
-                </div>
-                <span class="badge bg-success">{{ scan.profitable_found }} rentables</span>
-            </div>
-            {% else %}
-            <div class="list-group-item text-center text-muted">Sin escaneos previos</div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
 <script>
+let lastFinderResults = [];
+let lastAISelected = [];
+
 // Tab switching
 document.querySelectorAll('[data-bs-tab]').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -242,9 +248,9 @@ async function runFinder() {
         max_bsr: parseInt(document.getElementById('finder-max-bsr').value),
         max_fba_sellers: parseInt(document.getElementById('finder-max-sellers').value),
         min_monthly_sales: parseInt(document.getElementById('finder-min-sales').value),
-        min_reviews: parseInt(document.getElementById('finder-min-reviews').value),
+        min_reviews: 0,
         exclude_amazon: document.getElementById('finder-exclude-amz').checked,
-        sort_by: document.getElementById('finder-sort').value,
+        sort_by: "bsr",
         max_results: parseInt(document.getElementById('finder-limit').value),
     };
 
@@ -259,6 +265,7 @@ async function runFinder() {
         if (result.error) {
             document.getElementById('finder-results').innerHTML = `<div class="alert alert-danger">${result.error}</div>`;
         } else {
+            lastFinderResults = result.products || [];
             renderFinderResults(result);
         }
     } catch (err) {
@@ -272,71 +279,243 @@ async function runFinder() {
 function renderFinderResults(data) {
     const container = document.getElementById('finder-results');
     const count = document.getElementById('finder-count');
+    const exportBtn = document.getElementById('export-btn');
+    const aiCard = document.getElementById('ai-select-card');
+
     count.style.display = 'inline';
-    count.textContent = `${data.total_found} encontrados`;
+    count.textContent = `${data.products?.length || 0} encontrados`;
+    exportBtn.style.display = 'inline-block';
+    document.getElementById('export-excel-btn').style.display = 'inline-block';
+    aiCard.style.display = 'block';
 
     if (!data.products || data.products.length === 0) {
-        container.innerHTML = '<div class="alert alert-warning">No se encontraron productos con esos criterios.</div>';
+        container.innerHTML = '<div class="alert alert-warning">No se encontraron productos.</div>';
         return;
     }
 
-    const asins = [];
-    let html = `<p class="small text-muted mb-3">${data.products.length} productos analizados. Ganancia calculada sin precio de proveedor.</p>`;
+    let html = `<p class="small text-muted mb-2">${data.total_found || data.products.length} productos encontrados. La IA puede seleccionar los mejores automaticamente.</p>`;
+    html += '<div class="table-responsive"><table class="table table-hover table-sm"><thead><tr>';
+    html += '<th>ASIN</th><th>Producto</th><th>Precio</th><th>BSR</th><th>Sellers</th><th>Sales/mo</th><th>FBA Fee</th></tr></thead><tbody>';
 
     data.products.forEach(p => {
-        const roi = p.calc?.roi_pct || 0;
-        const profit = p.calc?.net_profit || 0;
-        const badge = roi >= 20 ? 'success' : roi >= 10 ? 'warning' : 'secondary';
-        asins.push(p.asin);
+        html += `<tr>
+            <td><code class="small">${p.asin}</code></td>
+            <td><small class="fw-bold">${p.title?.substring(0, 50) || ''}</small></td>
+            <td>$${p.sell_price?.toFixed(2) || p.amazon_price?.toFixed(2) || '?'}</td>
+            <td>${p.bsr?.toLocaleString() || 'N/A'}</td>
+            <td>${p.fba_seller_count || '?'}</td>
+            <td>${p.monthly_sales_est?.toLocaleString() || '?'}</td>
+            <td>$${p.fba_fee?.toFixed(2) || '?'}</td>
+        </tr>`;
+    });
 
+    html += '</tbody></table></div>';
+    container.innerHTML = html;
+}
+
+// ─── AI Select Best Products ───
+async function aiSelectProducts() {
+    if (lastFinderResults.length === 0) {
+        alert('Primero busca productos con el Finder');
+        return;
+    }
+
+    const budget = parseFloat(document.getElementById('ai-budget').value) || 500;
+    const container = document.getElementById('ai-results-body');
+    const card = document.getElementById('ai-results-card');
+    card.style.display = 'block';
+    container.innerHTML = '<div class="text-center py-4"><span class="spinner-border spinner-border-sm text-warning"></span> IA analizando productos...</div>';
+
+    try {
+        const resp = await fetch('/scanner/api/ai-select', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({products: lastFinderResults, budget: budget, max_products: 10}),
+        });
+        const data = await resp.json();
+        lastAISelected = data.selected || [];
+        renderAIResults(data);
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    }
+}
+
+function renderAIResults(data) {
+    const container = document.getElementById('ai-results-body');
+    const selected = data.selected || [];
+
+    if (selected.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No se encontraron productos rentables con ese presupuesto.</div>';
+        return;
+    }
+
+    let html = `
+        <div class="p-3" style="background:var(--bg-dark);">
+            <div class="row g-2 text-center">
+                <div class="col-3"><strong class="text-warning">${selected.length}</strong><br><small class="text-muted">Productos</small></div>
+                <div class="col-3"><strong>$${data.total_investment?.toFixed(0) || 0}</strong><br><small class="text-muted">Inversion</small></div>
+                <div class="col-3"><strong class="text-success">+$${data.expected_profit?.toFixed(0) || 0}</strong><br><small class="text-muted">Ganancia</small></div>
+                <div class="col-3"><strong class="text-success">${data.expected_roi || 0}%</strong><br><small class="text-muted">ROI</small></div>
+            </div>
+        </div>
+    `;
+
+    selected.forEach((p, i) => {
+        const riskClass = p.risk === 'BAJO' ? 'success' : p.risk === 'MEDIO' ? 'warning' : 'danger';
         html += `
-            <div class="scan-result-card mb-2">
+            <div class="p-3 border-bottom" style="border-color:var(--border-color) !important;">
                 <div class="d-flex justify-content-between align-items-start">
                     <div class="d-flex gap-2">
-                        ${p.image_url ? `<img src="${p.image_url}" style="width:40px;height:40px;object-fit:contain;border-radius:6px;background:#fff;">` : ''}
+                        <span class="badge bg-warning" style="font-size:1rem;">#${i + 1}</span>
                         <div>
                             <code class="small">${p.asin}</code>
-                            <span class="badge bg-${badge} ms-1">${p.sell_price ? '$'+p.sell_price.toFixed(2) : '?'}</span>
-                            <p class="mb-0 small fw-bold">${p.title?.substring(0, 65) || 'Unknown'}${p.title?.length > 65 ? '...' : ''}</p>
+                            <span class="badge bg-${riskClass} ms-1">Riesgo ${p.risk}</span>
+                            <p class="mb-0 small fw-bold">${p.title?.substring(0, 70) || ''}</p>
                             <small class="text-muted">
-                                BSR: ${p.bsr?.toLocaleString() || 'N/A'} |
+                                BSR: ${p.bsr?.toLocaleString() || '?'} |
                                 Sellers: ${p.fba_seller_count || '?'} |
-                                Sales/mo: ${p.monthly_sales_est || '?'} |
-                                Reviews: ${p.review_count || 0} |
-                                FBA Fee: $${p.fba_fee?.toFixed(2) || '?'}
-                                ${p.is_amazon_seller ? ' | <span class="text-danger">AMZ</span>' : ''}
+                                Sales/mo: ${p.monthly_sales_est?.toLocaleString() || '?'}
                             </small>
+                            ${p.priority_reasons?.length ? `<br><small class="text-warning">${p.priority_reasons.join(' | ')}</small>` : ''}
                         </div>
                     </div>
-                    <button class="btn btn-sm btn-outline-warning" onclick="addProduct('${p.asin}', this)">+ Agregar</button>
+                    <div class="text-end" style="min-width:150px;">
+                        <div class="text-warning fw-bold">${p.recommended_qty} unidades</div>
+                        <small class="text-muted">Precio: $${p.amazon_price?.toFixed(2) || '?'}</small><br>
+                        <small class="text-muted">Costo est: $${p.supplier_cost_estimated?.toFixed(2) || '?'}</small><br>
+                        <small class="text-muted">Inversion: $${p.total_cost?.toFixed(2) || '?'}</small><br>
+                        <strong class="text-success">+$${p.expected_profit?.toFixed(2) || '?'}</strong>
+                    </div>
                 </div>
             </div>
         `;
     });
 
     container.innerHTML = html;
-    window._finderAsins = asins;
 }
 
-async function addProduct(asin, btn) {
-    btn.disabled = true;
-    btn.textContent = 'Agregando...';
+// ─── Search in Stores ───
+async function searchInStores() {
+    if (lastAISelected.length === 0) {
+        alert('Primero deja que la IA seleccione productos');
+        return;
+    }
+
+    const card = document.getElementById('store-links-card');
+    const container = document.getElementById('store-links-body');
+    card.style.display = 'block';
+    container.innerHTML = '<div class="text-center py-4"><span class="spinner-border spinner-border-sm"></span> Buscando en tiendas...</div>';
+
     try {
-        const resp = await fetch('/scanner/api/add-to-products', {
+        const resp = await fetch('/scanner/api/search-stores', {
             method: 'POST',
             headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify([asin]),
+            body: JSON.stringify({products: lastAISelected}),
         });
         const data = await resp.json();
-        if (data.added > 0) {
-            btn.textContent = 'Agregado';
-            btn.classList.remove('btn-outline-warning');
-            btn.classList.add('btn-success');
-        } else {
-            btn.textContent = 'Ya existe';
+        renderStoreLinks(data.results);
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    }
+}
+
+function renderStoreLinks(results) {
+    const container = document.getElementById('store-links-body');
+
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No se encontraron links.</div>';
+        return;
+    }
+
+    let html = '';
+    results.forEach((r, i) => {
+        html += `
+            <div class="mb-3 p-3 rounded" style="background:var(--bg-dark);border:1px solid var(--border-color);">
+                <h6 class="mb-2"><span class="badge bg-warning me-2">#${i + 1}</span> ${r.title}</h6>
+                <p class="small text-muted mb-2">Buscar: <strong>${r.search_terms}</strong></p>
+                <div class="d-flex flex-wrap gap-1">
+                    <a href="${r.stores.amazon}" target="_blank" class="btn btn-sm btn-outline-warning">Amazon</a>
+                    <a href="${r.stores.walmart}" target="_blank" class="btn btn-sm btn-outline-info">Walmart</a>
+                    <a href="${r.stores.costco}" target="_blank" class="btn btn-sm btn-outline-primary">Costco</a>
+                    <a href="${r.stores.sams}" target="_blank" class="btn btn-sm btn-outline-danger">Sam's Club</a>
+                    <a href="${r.stores.target}" target="_blank" class="btn btn-sm btn-outline-success">Target</a>
+                    <a href="${r.stores.faire}" target="_blank" class="btn btn-sm btn-outline-secondary">Faire</a>
+                    <a href="${r.stores.tundra}" target="_blank" class="btn btn-sm btn-outline-secondary">Tundra</a>
+                    <a href="${r.stores.google_shopping}" target="_blank" class="btn btn-sm btn-outline-light">Google Shopping</a>
+                </div>
+                ${r.wholesale_tips?.length ? `<div class="mt-2">${r.wholesale_tips.map(t => `<small class="d-block text-muted"><i class="bi bi-check-circle text-success"></i> ${t}</small>`).join('')}</div>` : ''}
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+// ─── Export CSV ───
+function exportCSV() {
+    if (lastFinderResults.length === 0) return;
+    downloadCSV(lastFinderResults, 'fba_productos_finder.csv');
+}
+
+function exportAICSV() {
+    if (lastAISelected.length === 0) return;
+    downloadCSV(lastAISelected, 'fba_productos_seleccionados.csv');
+}
+
+function downloadCSV(products, filename) {
+    let csv = 'ASIN,Titulo,Marca,Precio,BSR,Sellers,Ventas/mes,FBA Fee,Link\n';
+    products.forEach(p => {
+        csv += `${p.asin},"${(p.title||'').substring(0,60).replace(/"/g,'""')}",${p.brand||''},${p.sell_price?.toFixed(2)||p.amazon_price?.toFixed(2)||0},${p.bsr||0},${p.fba_seller_count||0},${p.monthly_sales_est||0},${p.fba_fee?.toFixed(2)||0},https://www.amazon.com/dp/${p.asin}\n`;
+    });
+    const blob = new Blob([csv], {type: 'text/csv'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename; a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ─── Excel Export ───
+async function exportExcel() {
+    if (lastFinderResults.length === 0) return;
+    await downloadExcel('/scanner/api/export-excel', {
+        products: lastFinderResults,
+        stats: {total_scanned: lastFinderResults.length, profitable_count: lastFinderResults.length}
+    }, 'fba_escaneo_productos.xlsx');
+}
+
+async function exportAIExcel() {
+    if (lastAISelected.length === 0) return;
+    const budget = parseFloat(document.getElementById('ai-budget').value) || 500;
+    await downloadExcel('/scanner/api/export-shopping-excel', {
+        products: lastAISelected,
+        summary: {
+            total_products: lastAISelected.length,
+            total_investment: lastAISelected.reduce((s, p) => s + (p.total_cost || 0), 0),
+            expected_profit: lastAISelected.reduce((s, p) => s + (p.expected_profit || 0), 0),
+            expected_roi: 0,
         }
-    } catch (e) {
-        btn.textContent = 'Error';
+    }, 'fba_lista_compras.xlsx');
+}
+
+async function downloadExcel(url, data, filename) {
+    try {
+        const resp = await fetch(url, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        if (resp.ok) {
+            const blob = await resp.blob();
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } else {
+            alert('Error al generar Excel');
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
     }
 }
 
@@ -348,7 +527,6 @@ document.getElementById('scan-form').addEventListener('submit', async (e) => {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('supplier_id', document.getElementById('scan-supplier').value || '');
     formData.append('min_roi', document.getElementById('scan-min-roi').value);
     formData.append('min_profit', document.getElementById('scan-min-profit').value);
 
@@ -359,8 +537,12 @@ document.getElementById('scan-form').addEventListener('submit', async (e) => {
     try {
         const resp = await fetch('/scanner/api/scan', {method: 'POST', body: formData});
         const data = await resp.json();
-        if (resp.ok) renderScanResults(data);
-        else document.getElementById('scan-results').innerHTML = `<div class="alert alert-danger">${data.detail || 'Error'}</div>`;
+        if (resp.ok) {
+            lastFinderResults = data.profitable || [];
+            renderScanResults(data);
+        } else {
+            document.getElementById('scan-results').innerHTML = `<div class="alert alert-danger">${data.detail || 'Error'}</div>`;
+        }
     } catch (err) {
         document.getElementById('scan-results').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
     } finally {
@@ -373,58 +555,40 @@ function renderScanResults(data) {
     const s = data.stats;
     let html = `
         <div class="row g-2 mb-3">
-            <div class="col-3"><div class="text-center p-2 bg-success bg-opacity-10 rounded"><h5 class="text-success mb-0">${s.profitable_found}</h5><small>Rentables</small></div></div>
-            <div class="col-3"><div class="text-center p-2 bg-warning bg-opacity-10 rounded"><h5 class="text-warning mb-0">${s.marginal_found}</h5><small>Marginales</small></div></div>
+            <div class="col-3"><div class="text-center p-2 bg-success bg-opacity-10 rounded"><h5 class="text-success mb-0">${s.profitable_count}</h5><small>Rentables</small></div></div>
+            <div class="col-3"><div class="text-center p-2 bg-warning bg-opacity-10 rounded"><h5 class="text-warning mb-0">${s.marginal_count}</h5><small>Marginales</small></div></div>
             <div class="col-3"><div class="text-center p-2 bg-danger bg-opacity-10 rounded"><h5 class="text-danger mb-0">${s.not_profitable_count}</h5><small>No rent.</small></div></div>
             <div class="col-3"><div class="text-center p-2 bg-info bg-opacity-10 rounded"><h5 class="text-info mb-0">${s.avg_roi}%</h5><small>ROI Prom</small></div></div>
-        </div>`;
+        </div>
+        <button class="btn btn-sm btn-warning w-100 mb-3" onclick="aiSelectProducts()">
+            <i class="bi bi-robot"></i> IA ELIGE LOS MEJORES
+        </button>
+    `;
 
     data.profitable.forEach(p => {
-        html += `
-            <div class="scan-result-card mb-2">
-                <div class="d-flex justify-content-between">
-                    <div>
-                        <code>${p.asin}</code> <span class="badge bg-success">${p.roi_pct}% ROI</span>
-                        <p class="mb-0 small">${p.title?.substring(0, 60) || ''}</p>
-                        <small class="text-muted">BSR: ${p.bsr?.toLocaleString()} | Sellers: ${p.fba_seller_count}</small>
-                    </div>
-                    <div class="text-end">
-                        <div class="text-success fw-bold">$${p.net_profit?.toFixed(2)}</div>
-                        <small class="text-muted">$${p.sell_price?.toFixed(2)} vs $${p.buy_price?.toFixed(2)}</small>
-                    </div>
-                </div>
-            </div>`;
+        html += `<div class="p-2 border-bottom"><small><code>${p.asin}</code> ${p.title?.substring(0,50)} - <strong>$${p.sell_price?.toFixed(2)||'?'}</strong> - ROI: ${p.roi_pct}%</small></div>`;
     });
 
     document.getElementById('scan-results').innerHTML = html;
+    document.getElementById('ai-select-card').style.display = 'block';
 }
 
 // ─── Best Sellers ───
 async function loadBestSellers() {
     const cat = document.getElementById('bs-category').value;
-    const limit = document.getElementById('bs-limit').value;
     const container = document.getElementById('bs-results');
     container.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Cargando...</div>';
 
     try {
-        const resp = await fetch(`/scanner/api/bestsellers/${cat}?limit=${limit}`);
+        const resp = await fetch(`/scanner/api/bestsellers/${cat}?limit=30`);
         const data = await resp.json();
-
         if (!data.products || data.products.length === 0) {
             container.innerHTML = '<div class="alert alert-warning">Sin resultados</div>';
             return;
         }
-
-        let html = `<p class="small text-muted mb-3">${data.total} best sellers cargados</p><div class="table-responsive"><table class="table table-hover table-sm"><thead><tr><th>#</th><th>Producto</th><th>Precio</th><th>BSR</th><th>Sellers</th><th>Sales/mo</th></tr></thead><tbody>`;
+        let html = '<div class="table-responsive"><table class="table table-hover table-sm"><thead><tr><th>#</th><th>Producto</th><th>Precio</th><th>BSR</th></tr></thead><tbody>';
         data.products.forEach((p, i) => {
-            html += `<tr>
-                <td>${i + 1}</td>
-                <td><small class="fw-bold">${p.title?.substring(0, 50) || ''}</small><br><code class="small">${p.asin}</code></td>
-                <td>$${p.sell_price?.toFixed(2) || '?'}</td>
-                <td>${p.bsr?.toLocaleString() || 'N/A'}</td>
-                <td>${p.fba_seller_count || '?'}</td>
-                <td>${p.monthly_sales_est || '?'}</td>
-            </tr>`;
+            html += `<tr><td>${i+1}</td><td><small>${p.title?.substring(0,50)}</small><br><code class="small">${p.asin}</code></td><td>$${p.sell_price?.toFixed(2)||'?'}</td><td>${p.bsr?.toLocaleString()||'N/A'}</td></tr>`;
         });
         html += '</tbody></table></div>';
         container.innerHTML = html;

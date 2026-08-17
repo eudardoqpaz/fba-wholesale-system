@@ -203,7 +203,6 @@ function renderResults(data) {
     document.getElementById('sum-investment').textContent = '$' + data.total_investment.toFixed(0);
     document.getElementById('sum-profit').textContent = '$' + data.expected_profit.toFixed(0);
     document.getElementById('sum-roi').textContent = data.expected_roi + '%';
-    document.getElementById('budget-used').textContent = data.budget_used + '%';
 
     const count = document.getElementById('list-count');
     count.style.display = 'inline';

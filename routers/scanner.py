@@ -1,8 +1,8 @@
 """
-Scanner Router - Upload price lists AND search Keepa's Product Finder.
+Scanner Router - Upload price lists, search Keepa, export to Excel, AI analysis, store search.
 """
 from fastapi import APIRouter, Depends, UploadFile, File, Form, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, StreamingResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.requests import Request
 from sqlalchemy import select
@@ -10,8 +10,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from database import get_db
 from models import Supplier, ScanResult, Product
 from services.scanner import scanner
+from services.scraper import scraper
+from services.calculator import ProfitCalculator
+from services.excel_export import generate_scan_results_excel, generate_shopping_list_excel
 from pydantic import BaseModel
 from typing import Optional
+import io
+import csv
 
 router = APIRouter()
 templates = Jinja2Templates(directory="templates")
@@ -30,6 +35,16 @@ class FinderQuery(BaseModel):
     max_results: int = 50
 
 
+class AISelectQuery(BaseModel):
+    products: list[dict]
+    budget: float = 500
+    max_products: int = 10
+
+
+class StoreSearchQuery(BaseModel):
+    products: list[dict]  # List of products with title, brand, asin
+
+
 @router.get("/", response_class=HTMLResponse)
 async def scanner_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Scanner page with both CSV upload and Product Finder."""
@@ -39,7 +54,6 @@ async def scanner_page(request: Request, db: AsyncSession = Depends(get_db)):
     scans_result = await db.execute(select(ScanResult).order_by(ScanResult.created_at.desc()).limit(10))
     recent_scans = scans_result.scalars().all()
 
-    # Common US categories for the finder
     categories = [
         {"id": 1055398, "name": "Home & Kitchen"},
         {"id": 165796011, "name": "Tools & Home Improvement"},
@@ -179,3 +193,322 @@ async def add_to_products(asins: list[str], db: AsyncSession = Depends(get_db)):
 
     await db.commit()
     return {"status": "ok", "added": added}
+
+
+# ─── Export to Excel/CSV ───
+
+@router.post("/api/export")
+async def export_to_csv(data: dict):
+    """Export scan results to CSV file."""
+    products = data.get("products", [])
+    if not products:
+        raise HTTPException(400, "No products to export")
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+
+    # Header
+    writer.writerow([
+        "ASIN", "Titulo", "Marca", "Precio Amazon", "Costo Proveedor",
+        "FBA Fee", "Referral Fee", "Ganancia Neta", "ROI %", "BSR",
+        "Sellers FBA", "Ventas/mes", "Reviews", "Rating", "Recomendacion",
+        "Link Amazon"
+    ])
+
+    # Data
+    for p in products:
+        calc = p.get("calc", {})
+        writer.writerow([
+            p.get("asin", ""),
+            p.get("title", "")[:80],
+            p.get("brand", ""),
+            f"${p.get('amazon_price', 0):.2f}",
+            f"${p.get('supplier_cost', 0):.2f}",
+            f"${p.get('fba_fee', 0):.2f}",
+            f"${calc.get('referral_fee', 0):.2f}",
+            f"${calc.get('net_profit', 0):.2f}",
+            f"{calc.get('roi_pct', 0)}%",
+            p.get("bsr", ""),
+            p.get("fba_seller_count", ""),
+            p.get("monthly_sales_est", ""),
+            p.get("review_count", ""),
+            p.get("rating", ""),
+            calc.get("recommendation", ""),
+            f"https://www.amazon.com/dp/{p.get('asin', '')}",
+        ])
+
+    output.seek(0)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=fba_productos.csv"}
+    )
+
+
+# ─── AI Select Best Products ───
+
+@router.post("/api/ai-select")
+async def ai_select_best(query: AISelectQuery):
+    """AI analyzes all products and selects the best ones within budget."""
+    products = query.products
+    budget = query.budget
+    max_products = query.max_products
+
+    # Calculate profitability for each product
+    analyzed = []
+    for p in products:
+        sell_price = p.get("amazon_price", 0) or p.get("sell_price", 0)
+        if sell_price <= 0:
+            continue
+
+        # Estimate wholesale cost (55% of Amazon price for products without supplier cost)
+        supplier_cost = p.get("supplier_cost", 0) or (sell_price * 0.55)
+
+        calc = ProfitCalculator.calculate(
+            sell_price=sell_price,
+            buy_price=supplier_cost,
+            weight_lbs=p.get("weight_lbs", 1.0),
+            keepa_fba_fee=p.get("fba_fee"),
+            keepa_referral_pct=p.get("referral_fee_pct"),
+        )
+
+        # Calculate opportunity score
+        roi = calc.get("roi_pct", 0)
+        profit = calc.get("net_profit", 0)
+        monthly_sales = p.get("monthly_sales_est", 0) or 0
+        sellers = p.get("fba_seller_count", 99)
+        bsr = p.get("bsr", 999999)
+        is_amazon = p.get("is_amazon_seller", False)
+
+        # Score: higher is better
+        score = 0
+        if roi >= 25:
+            score += 30
+        elif roi >= 20:
+            score += 20
+        elif roi >= 15:
+            score += 10
+
+        if profit >= 5:
+            score += 20
+        elif profit >= 3:
+            score += 10
+
+        if monthly_sales >= 10000:
+            score += 25
+        elif monthly_sales >= 3000:
+            score += 15
+        elif monthly_sales >= 500:
+            score += 5
+
+        if sellers <= 3:
+            score += 15
+        elif sellers <= 8:
+            score += 10
+        elif sellers <= 15:
+            score += 5
+
+        if bsr <= 1000:
+            score += 10
+        elif bsr <= 5000:
+            score += 5
+
+        if is_amazon:
+            score -= 30  # Big penalty for Amazon competition
+
+        # Risk assessment
+        risk = "BAJO"
+        if is_amazon or sellers > 15 or bsr > 50000:
+            risk = "ALTO"
+        elif sellers > 8 or bsr > 20000:
+            risk = "MEDIO"
+
+        analyzed.append({
+            **p,
+            "supplier_cost_estimated": round(supplier_cost, 2),
+            "calc": calc,
+            "score": score,
+            "risk": risk,
+            "priority_reasons": _get_priority_reasons(roi, profit, monthly_sales, sellers, is_amazon),
+        })
+
+    # Sort by score (best first)
+    analyzed.sort(key=lambda x: x["score"], reverse=True)
+
+    # Select top products within budget
+    selected = []
+    remaining = budget
+    for p in analyzed[:max_products * 2]:  # Consider more candidates
+        cost = p.get("supplier_cost_estimated", 0)
+        if cost <= 0:
+            continue
+
+        # How many can we buy?
+        qty = min(int(remaining / cost), 20)
+        if qty < 3:
+            continue
+
+        total_cost = round(qty * cost, 2)
+        if total_cost > remaining:
+            continue
+
+        p["recommended_qty"] = qty
+        p["total_cost"] = total_cost
+        p["expected_profit"] = round(qty * p["calc"]["net_profit"], 2)
+        selected.append(p)
+        remaining -= total_cost
+
+        if len(selected) >= max_products:
+            break
+
+    return {
+        "selected": selected,
+        "total_investment": round(budget - remaining, 2),
+        "expected_profit": round(sum(p["expected_profit"] for p in selected), 2),
+        "expected_roi": round(
+            sum(p["expected_profit"] for p in selected) / max(budget - remaining, 1) * 100, 1
+        ),
+        "total_candidates": len(analyzed),
+        "budget_used_pct": round((budget - remaining) / budget * 100, 1),
+    }
+
+
+def _get_priority_reasons(roi, profit, sales, sellers, is_amazon):
+    """Generate reasons why a product is prioritized."""
+    reasons = []
+    if roi >= 25:
+        reasons.append(f"ROI excelente ({roi}%)")
+    if profit >= 5:
+        reasons.append(f"Ganancia alta (${profit:.2f})")
+    if sales >= 10000:
+        reasons.append(f"Alta demanda ({sales:,}/mes)")
+    elif sales >= 3000:
+        reasons.append(f"Buena demanda ({sales:,}/mes)")
+    if sellers <= 3:
+        reasons.append("Poca competencia")
+    if is_amazon:
+        reasons.append("CUIDADO: Amazon vende este producto")
+    return reasons
+
+
+# ─── Search Products in Stores ───
+
+@router.post("/api/search-stores")
+async def search_products_in_stores(query: StoreSearchQuery):
+    """Search for products in retail stores and return direct links."""
+    products = query.products
+    results = []
+
+    for p in products[:10]:  # Limit to 10 products
+        title = p.get("title", "")
+        brand = p.get("brand", "")
+        asin = p.get("asin", "")
+
+        # Extract key search terms from title
+        search_terms = _extract_search_terms(title, brand)
+
+        store_links = {
+            "asin": asin,
+            "title": title[:60],
+            "search_terms": search_terms,
+            "stores": {
+                "amazon": f"https://www.amazon.com/dp/{asin}",
+                "walmart": f"https://www.walmart.com/search?q={search_terms.replace(' ', '+')}",
+                "target": f"https://www.target.com/s?searchTerm={search_terms.replace(' ', '+')}",
+                "costco": f"https://www.costco.com/CatalogSearch?dept=All&keyword={search_terms.replace(' ', '+')}",
+                "sams": f"https://www.samsclub.com/search/{search_terms.replace(' ', '%20')}",
+                "faire": f"https://www.faire.com/search?q={search_terms.replace(' ', '+')}",
+                "tundra": f"https://www.tundra.com/search?q={search_terms.replace(' ', '+')}",
+                "biglots": f"https://www.biglots.com/search?q={search_terms.replace(' ', '+')}",
+                "google_shopping": f"https://www.google.com/search?q={search_terms.replace(' ', '+')}+wholesale+price&tbm=shop",
+            },
+            "wholesale_tips": _get_wholesale_tips(title, brand),
+        }
+        results.append(store_links)
+
+    return {"results": results}
+
+
+def _extract_search_terms(title: str, brand: str) -> str:
+    """Extract useful search terms from product title."""
+    # Use brand + first key words from title
+    if brand and len(brand) > 2:
+        # Remove brand from title to avoid duplication
+        clean_title = title.replace(brand, "").strip()
+        words = clean_title.split()[:4]
+        return f"{brand} {' '.join(words)}"
+    else:
+        words = title.split()[:6]
+        return " ".join(words)
+
+
+def _get_wholesale_tips(title: str, brand: str) -> list:
+    """Get tips on where to find this product wholesale."""
+    tips = []
+    title_lower = title.lower()
+    brand_lower = (brand or "").lower()
+
+    # Brand-specific tips
+    brand_wholesale = {
+        "medicube": "Busca en Faire.com o contacta directamente a medicube para wholesale",
+        "owala": "Busca en Faire.com o Tundra.com - marca popular con buen margen",
+        "drift": "Busca en Faire.com - marca de lifestyle con precios wholesale accesibles",
+        "zevo": "Busca en Costco, Sam's Club, o contacta a Zevo directamente",
+        "brita": "Disponible en Costco y Sam's Club en packs grandes",
+        "harry potter": "Busca en distribuidores de juguetes como D&H o Almo",
+        "lego": "Contacta LEGO directamente o distribuidores autorizados",
+        "huggies": "Disponible en Costco, Sam's Club, y distribuidores como UNFI",
+        "pampers": "Disponible en Costco, Sam's Club, y distribuidores como UNFI",
+        "tide": "Disponible en Costco, Sam's Club, y distribuidores como UNFI",
+    }
+
+    for b, tip in brand_wholesale.items():
+        if b in brand_lower or b in title_lower:
+            tips.append(tip)
+            break
+
+    if not tips:
+        tips.append(f"Busca '{brand or title[:30]}' en Faire.com, Tundra.com, y Google Shopping wholesale")
+
+    tips.append("Compara precios en Costco Business Center (Chantilly, VA)")
+    tips.append("Revisa Walmart Clearance en tienda para posibles deals")
+
+    return tips
+
+
+# ─── Excel Export Endpoints ───
+
+@router.post("/api/export-excel")
+async def export_scan_to_excel(data: dict):
+    """Export scan results to formatted Excel file."""
+    products = data.get("products", [])
+    stats = data.get("stats", {})
+
+    if not products:
+        raise HTTPException(400, "No products to export")
+
+    buffer = generate_scan_results_excel(products, stats)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=fba_escaneo_productos.xlsx"}
+    )
+
+
+@router.post("/api/export-shopping-excel")
+async def export_shopping_to_excel(data: dict):
+    """Export AI-selected shopping list to formatted Excel with store links."""
+    shopping_list = data.get("products", [])
+    summary = data.get("summary", {})
+
+    if not shopping_list:
+        raise HTTPException(400, "No products to export")
+
+    buffer = generate_shopping_list_excel(shopping_list, summary)
+
+    return StreamingResponse(
+        buffer,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": "attachment; filename=fba_lista_compras.xlsx"}
+    )
