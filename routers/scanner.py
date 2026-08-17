@@ -337,53 +337,63 @@ async def ai_select_best(query: AISelectQuery, db: AsyncSession = Depends(get_db
         # SCORING - Volume is KING
         score = 0
 
-        # VOLUME (0-50 points)
+        # VOLUME (0-40 points)
         if monthly_sales >= 10000:
-            score += 50
-        elif monthly_sales >= 5000:
             score += 40
+        elif monthly_sales >= 5000:
+            score += 32
         elif monthly_sales >= 2000:
-            score += 30
+            score += 24
         elif monthly_sales >= 1000:
-            score += 25
-        elif monthly_sales >= 500:
-            score += 15
-        elif monthly_sales >= 300:
-            score += 10
-        elif monthly_sales >= 100:
-            score += 5
-
-        # ROI (0-25 points)
-        if roi >= 30:
-            score += 25
-        elif roi >= 25:
             score += 20
-        elif roi >= 20:
-            score += 15
-        elif roi >= 15:
-            score += 10
-
-        # PROFIT (0-15 points)
-        if profit >= 8:
-            score += 15
-        elif profit >= 5:
+        elif monthly_sales >= 500:
             score += 12
-        elif profit >= 3:
+        elif monthly_sales >= 300:
             score += 8
-        elif profit >= 2:
+        elif monthly_sales >= 100:
             score += 4
 
-        # COMPETITION (0-10 points)
-        if sellers <= 2:
+        # ROI (0-20 points)
+        if roi >= 30:
+            score += 20
+        elif roi >= 25:
+            score += 16
+        elif roi >= 20:
+            score += 12
+        elif roi >= 15:
+            score += 8
+
+        # PROFIT (0-10 points)
+        if profit >= 8:
             score += 10
+        elif profit >= 5:
+            score += 8
+        elif profit >= 3:
+            score += 5
+        elif profit >= 2:
+            score += 2
+
+        # COMPETITION (0-30 points) - NOW MUCH MORE IMPORTANT!
+        if sellers <= 1:
+            score += 30  # MONOPOLY - best case
+        elif sellers <= 2:
+            score += 25
+        elif sellers <= 3:
+            score += 20
         elif sellers <= 5:
-            score += 7
+            score += 12
+        elif sellers <= 8:
+            score += 5
         elif sellers <= 10:
-            score += 4
+            score += 0
+        elif sellers <= 15:
+            score -= 10  # Penalty for high competition
+        else:
+            score -= 20  # Big penalty
 
         # PENALTIES
         if is_amazon:
-            score -= 40
+            score -= 50  # NEVER compete with Amazon
         if bsr > 50000:
             score -= 10
 
@@ -391,7 +401,7 @@ async def ai_select_best(query: AISelectQuery, db: AsyncSession = Depends(get_db
         risk = "BAJO"
         if is_amazon or sellers > 15 or bsr > 50000:
             risk = "ALTO"
-        elif sellers > 8 or bsr > 20000 or monthly_sales < 500:
+        elif sellers > 5 or bsr > 20000 or monthly_sales < 500:
             risk = "MEDIO"
 
         analyzed.append({
