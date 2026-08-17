@@ -1,0 +1,297 @@
+{% extends "base.html" %}
+{% block title %}Descubrir Productos - FBA System{% endblock %}
+{% block page_title %}Descubrir Productos{% endblock %}
+
+{% block content %}
+<div class="alert alert-warning mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <i class="bi bi-robot" style="font-size:2rem;"></i>
+        <div>
+            <strong>Modo Autonomo</strong> - La IA investiga por ti y te dice exactamente QUE comprar.
+            <br><small>Tu solo defines el presupuesto y nivel de riesgo. El sistema hace el resto.</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Config -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-sliders"></i> Configuracion</h6>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Presupuesto Total ($)</label>
+                    <input type="number" class="form-control form-control-lg" id="budget" value="1000" min="100" step="100">
+                    <div class="form-text">Cuanto dinero tienes para invertir en tu primera compra</div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nivel de Riesgo</label>
+                    <div class="d-grid gap-2">
+                        <button class="btn btn-outline-success risk-btn active" data-risk="conservative" onclick="selectRisk(this)">
+                            <i class="bi bi-shield-check"></i> Conservador
+                            <br><small>Productos seguros, baja competencia, margen alto</small>
+                        </button>
+                        <button class="btn btn-outline-warning risk-btn" data-risk="moderate" onclick="selectRisk(this)">
+                            <i class="bi bi-balance-scale"></i> Moderado
+                            <br><small>Balance entre riesgo y oportunidad</small>
+                        </button>
+                        <button class="btn btn-outline-danger risk-btn" data-risk="aggressive" onclick="selectRisk(this)">
+                            <i class="bi bi-lightning"></i> Agresivo
+                            <br><small>Mayor riesgo, mayor potencial de ganancia</small>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Categorias</label>
+                    <div class="d-flex flex-wrap gap-1">
+                        <button class="btn btn-sm btn-warning cat-btn active" data-cat="home" onclick="toggleCat(this)">Home & Kitchen</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="toys" onclick="toggleCat(this)">Toys</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="health" onclick="toggleCat(this)">Health</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="pet" onclick="toggleCat(this)">Pet</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="baby" onclick="toggleCat(this)">Baby</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="sports" onclick="toggleCat(this)">Sports</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="beauty" onclick="toggleCat(this)">Beauty</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="office" onclick="toggleCat(this)">Office</button>
+                        <button class="btn btn-sm btn-outline-secondary cat-btn" data-cat="tools" onclick="toggleCat(this)">Tools</button>
+                    </div>
+                </div>
+
+                <button class="btn btn-warning btn-lg w-100" onclick="discoverProducts()" id="discover-btn">
+                    <i class="bi bi-search"></i> BUSCAR PRODUCTOS
+                </button>
+                <div class="small text-muted mt-2 text-center">
+                    Esto puede tomar 1-3 minutos mientras la IA investiga
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results -->
+    <div class="col-lg-8">
+        <!-- Summary -->
+        <div id="summary-card" style="display:none;">
+            <div class="row g-2 mb-3">
+                <div class="col-3">
+                    <div class="card text-center p-2">
+                        <small class="text-muted">Productos</small>
+                        <h4 class="text-warning mb-0" id="sum-products">0</h4>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="card text-center p-2">
+                        <small class="text-muted">Inversion</small>
+                        <h4 class="mb-0" id="sum-investment">$0</h4>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="card text-center p-2">
+                        <small class="text-muted">Ganancia Esperada</small>
+                        <h4 class="text-success mb-0" id="sum-profit">$0</h4>
+                    </div>
+                </div>
+                <div class="col-3">
+                    <div class="card text-center p-2">
+                        <small class="text-muted">ROI Esperado</small>
+                        <h4 class="text-success mb-0" id="sum-roi">0%</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Shopping List -->
+        <div class="card">
+            <div class="card-header d-flex justify-content-between">
+                <h6 class="mb-0"><i class="bi bi-cart-check"></i> Lista de Compras</h6>
+                <span id="list-count" class="badge bg-warning" style="display:none;"></span>
+            </div>
+            <div class="card-body" id="results-container">
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-robot" style="font-size:3rem;"></i><br><br>
+                    <h5>Configura tu presupuesto y presiona BUSCAR</h5>
+                    <p>La IA investigara miles de productos y te dara una lista de compras lista.<br>
+                    Tu solo tienes que comprar lo que la lista dice.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.risk-btn.active { border-width: 2px; }
+.cat-btn.active { background: var(--accent) !important; color: #000 !important; border-color: var(--accent) !important; }
+.shopping-item { border-left: 3px solid var(--accent); padding: 1rem; margin-bottom: 0.5rem; background: var(--surface); border-radius: 0 8px 8px 0; }
+.shopping-item:hover { background: var(--surface2); }
+.risk-low { color: var(--green); }
+.risk-med { color: var(--accent); }
+.risk-high { color: var(--red); }
+</style>
+
+<script>
+let selectedRisk = 'conservative';
+let selectedCats = ['home'];
+
+function selectRisk(btn) {
+    document.querySelectorAll('.risk-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    selectedRisk = btn.dataset.risk;
+}
+
+function toggleCat(btn) {
+    btn.classList.toggle('active');
+    const cat = btn.dataset.cat;
+    if (selectedCats.includes(cat)) {
+        selectedCats = selectedCats.filter(c => c !== cat);
+    } else {
+        selectedCats.push(cat);
+    }
+    if (selectedCats.length === 0) {
+        btn.classList.add('active');
+        selectedCats = [cat];
+    }
+}
+
+async function discoverProducts() {
+    const budget = parseFloat(document.getElementById('budget').value) || 1000;
+    const btn = document.getElementById('discover-btn');
+    const container = document.getElementById('results-container');
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Investigando... (esto puede tomar 1-3 min)';
+    container.innerHTML = `
+        <div class="text-center py-5">
+            <div class="spinner-border text-warning" style="width:3rem;height:3rem;"></div>
+            <h5 class="mt-3">La IA esta investigando productos...</h5>
+            <p class="text-muted">Buscando en miles de productos de Amazon, analizando precios, competencia, y demanda.</p>
+            <div class="progress mt-3" style="height:4px;">
+                <div class="progress-bar progress-bar-striped progress-bar-animated bg-warning" style="width:100%"></div>
+            </div>
+        </div>
+    `;
+
+    try {
+        const resp = await fetch('/discover/api/find', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({
+                budget: budget,
+                risk_level: selectedRisk,
+                categories: selectedCats,
+            }),
+        });
+        const data = await resp.json();
+        renderResults(data);
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-search"></i> BUSCAR PRODUCTOS';
+    }
+}
+
+function renderResults(data) {
+    const list = data.shopping_list || [];
+
+    // Show summary
+    document.getElementById('summary-card').style.display = 'block';
+    document.getElementById('sum-products').textContent = data.total_products;
+    document.getElementById('sum-investment').textContent = '$' + data.total_investment.toFixed(0);
+    document.getElementById('sum-profit').textContent = '$' + data.expected_profit.toFixed(0);
+    document.getElementById('sum-roi').textContent = data.expected_roi + '%';
+    document.getElementById('budget-used').textContent = data.budget_used + '%';
+
+    const count = document.getElementById('list-count');
+    count.style.display = 'inline';
+    count.textContent = list.length + ' productos';
+
+    const container = document.getElementById('results-container');
+
+    if (list.length === 0) {
+        container.innerHTML = `
+            <div class="alert alert-warning">
+                No se encontraron productos que cumplan los criterios con ese presupuesto.
+                Intenta con un presupuesto mayor o nivel de riesgo "Moderado".
+            </div>
+        `;
+        return;
+    }
+
+    let html = `
+        <div class="alert alert-success mb-3">
+            <strong>Lista de compras lista!</strong> Estos son los productos que la IA recomienda comprar.
+            Inversion total: <strong>$${data.total_investment.toFixed(0)}</strong> |
+            Ganancia esperada: <strong>$${data.expected_profit.toFixed(0)}</strong> |
+            ROI: <strong>${data.expected_roi}%</strong>
+        </div>
+    `;
+
+    list.forEach((item, i) => {
+        const riskClass = item.risk_score <= 30 ? 'risk-low' : item.risk_score <= 60 ? 'risk-med' : 'risk-high';
+        const riskLabel = item.risk_score <= 30 ? 'Bajo' : item.risk_score <= 60 ? 'Medio' : 'Alto';
+
+        html += `
+            <div class="shopping-item">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex gap-2">
+                        <div class="text-center">
+                            <span class="badge bg-warning" style="font-size:1.2rem;">#${i + 1}</span>
+                        </div>
+                        ${item.image_url ? `<img src="${item.image_url}" style="width:50px;height:50px;object-fit:contain;border-radius:6px;background:#fff;">` : ''}
+                        <div>
+                            <code class="small">${item.asin}</code>
+                            <span class="badge bg-success ms-1">${item.roi_pct}% ROI</span>
+                            <span class="badge ${riskClass === 'risk-low' ? 'bg-success' : riskClass === 'risk-med' ? 'bg-warning text-dark' : 'bg-danger'} ms-1">Riesgo ${riskLabel}</span>
+                            <p class="mb-0 small fw-bold">${item.title}</p>
+                            <small class="text-muted">
+                                ${item.brand ? item.brand + ' | ' : ''}
+                                BSR: ${item.bsr?.toLocaleString() || '?'} |
+                                Ventas/mes: ~${item.monthly_sales || '?'} |
+                                Sellers: ${item.sellers || '?'}
+                            </small>
+                            ${item.notes ? `<br><small class="text-warning">${item.notes}</small>` : ''}
+                        </div>
+                    </div>
+                    <div class="text-end" style="min-width:180px;">
+                        <div class="mb-1">
+                            <small class="text-muted">Precio Amazon:</small>
+                            <strong>$${item.amazon_price?.toFixed(2) || '?'}</strong>
+                        </div>
+                        <div class="mb-1">
+                            <small class="text-muted">Costo estimado:</small>
+                            <strong>$${item.estimated_wholesale_cost?.toFixed(2) || '?'}/u</strong>
+                        </div>
+                        <div class="mb-1">
+                            <small class="text-muted">Cantidad:</small>
+                            <strong class="text-warning">${item.quantity} unidades</strong>
+                        </div>
+                        <div class="mb-1">
+                            <small class="text-muted">Inversion:</small>
+                            <strong>$${item.total_cost?.toFixed(2) || '?'}</strong>
+                        </div>
+                        <div>
+                            <small class="text-muted">Ganancia esperada:</small>
+                            <strong class="text-success">+$${item.expected_profit?.toFixed(2) || '?'}</strong>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    });
+
+    html += `
+        <div class="alert alert-info mt-3">
+            <strong>IMPORTANTE:</strong> Los costos son ESTIMADOS (55% del precio Amazon).
+            Cuando tengas el precio REAL del proveedor, subelo al Scanner para verificar 
+            la rentabilidad exacta antes de comprar.
+        </div>
+    `;
+
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}

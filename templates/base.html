@@ -18,6 +18,11 @@
         </div>
         <ul class="nav flex-column">
             <li class="nav-item">
+                <a class="nav-link {% if '/discover' in request.url.path %}active{% endif %}" href="/discover" style="color:var(--accent);font-weight:700;">
+                    <i class="bi bi-stars"></i> Descubrir Productos
+                </a>
+            </li>
+            <li class="nav-item">
                 <a class="nav-link {% if request.url.path == '/' %}active{% endif %}" href="/">
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
