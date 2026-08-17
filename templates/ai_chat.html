@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+{% block title %}Asesor IA - FBA System{% endblock %}
+{% block page_title %}Asesor IA{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <!-- Chat -->
+    <div class="col-lg-8">
+        <div class="card" style="height: 75vh; display:flex; flex-direction:column;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0"><i class="bi bi-robot"></i> Asesor FBA con IA</h6>
+                <span class="badge bg-success"><i class="bi bi-circle-fill"></i> Online</span>
+            </div>
+            <div class="card-body flex-grow-1 overflow-auto" id="chat-messages" style="padding:1rem;">
+                <div class="chat-msg bot">
+                    <div class="chat-bubble">
+                        <strong>Hola! Soy tu asesor de FBA Wholesale.</strong><br><br>
+                        Puedo ayudarte con:<br>
+                        - Explicarte como funciona el negocio<br>
+                        - Analizar si un producto es rentable<br>
+                        - Recomendarte que hacer paso a paso<br>
+                        - Resolver cualquier duda que tengas<br><br>
+                        <em>Preguntame lo que necesites!</em>
+                    </div>
+                </div>
+            </div>
+            <div class="card-footer" style="border-top:1px solid var(--border-color);">
+                <div class="input-group">
+                    <input type="text" class="form-control" id="chat-input"
+                           placeholder="Preguntale al asesor..."
+                           onkeypress="if(event.key==='Enter')sendMessage()">
+                    <button class="btn btn-warning" onclick="sendMessage()">
+                        <i class="bi bi-send"></i>
+                    </button>
+                </div>
+                <div class="mt-2 d-flex gap-2 flex-wrap">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="quickAsk('Como empiezo en FBA Wholesale?')">
+                        Como empiezo?
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="quickAsk('Donde encuentro proveedores mayoristas?')">
+                        Proveedores
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="quickAsk('Que son los fees de Amazon y como se calculan?')">
+                        Fees de Amazon
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="quickAsk('Dame un briefing de mi negocio')">
+                        Briefing
+                    </button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="quickAsk('Que errores cometen los principiantes?')">
+                        Errores comunes
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="col-lg-4">
+        <!-- Suggestions -->
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-lightbulb"></i> Sugerencias IA</h6></div>
+            <div class="card-body" id="suggestions-container">
+                <div class="text-center text-muted"><span class="spinner-border spinner-border-sm"></span> Analizando...</div>
+            </div>
+        </div>
+
+        <!-- Quick Analysis -->
+        <div class="card mb-3">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-search"></i> Analisis Rapido</h6></div>
+            <div class="card-body">
+                <p class="small text-muted">Pega un ASIN para que la IA lo analice:</p>
+                <div class="input-group input-group-sm">
+                    <input type="text" class="form-control" id="quick-asin" placeholder="B08N5WRWNW" maxlength="10">
+                    <button class="btn btn-warning" onclick="quickAnalyze()">Analizar</button>
+                </div>
+                <div id="quick-result" class="mt-2"></div>
+            </div>
+        </div>
+
+        <!-- Concepts -->
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0"><i class="bi bi-book"></i> Conceptos</h6></div>
+            <div class="card-body p-2">
+                <div class="d-flex flex-wrap gap-1">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('Buy Box')">Buy Box</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('BSR')">BSR</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('ROI')">ROI</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('FBA')">FBA</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('Referral Fee')">Referral Fee</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('Keepa')">Keepa</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('Private Label')">Private Label</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('Wholesale')">Wholesale</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('Resale Certificate')">Resale Cert</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="explainConcept('IPI Score')">IPI Score</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<style>
+.chat-msg { margin-bottom: 1rem; display: flex; }
+.chat-msg.user { justify-content: flex-end; }
+.chat-msg.bot { justify-content: flex-start; }
+.chat-bubble {
+    max-width: 80%;
+    padding: 0.8rem 1rem;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+}
+.chat-msg.user .chat-bubble {
+    background: var(--accent);
+    color: #000;
+    border-bottom-right-radius: 4px;
+}
+.chat-msg.bot .chat-bubble {
+    background: var(--surface2);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+}
+.chat-bubble strong { color: var(--accent); }
+.chat-msg.user .chat-bubble strong { color: #000; }
+</style>
+
+<script>
+const chatHistory = [];
+
+async function sendMessage() {
+    const input = document.getElementById('chat-input');
+    const msg = input.value.trim();
+    if (!msg) return;
+    input.value = '';
+
+    addMessage(msg, 'user');
+    chatHistory.push({role: 'user', content: msg});
+
+    const typing = addMessage('Pensando...', 'bot');
+
+    try {
+        const resp = await fetch('/ai/api/chat', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: msg, history: chatHistory.slice(-10)}),
+        });
+        const data = await resp.json();
+        typing.remove();
+        addMessage(data.response, 'bot');
+        chatHistory.push({role: 'assistant', content: data.response});
+    } catch (e) {
+        typing.remove();
+        addMessage('Error de conexion. Verifica que el servidor este corriendo.', 'bot');
+    }
+}
+
+function quickAsk(question) {
+    document.getElementById('chat-input').value = question;
+    sendMessage();
+}
+
+function addMessage(text, type) {
+    const container = document.getElementById('chat-messages');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${type}`;
+    div.innerHTML = `<div class="chat-bubble">${text}</div>`;
+    container.appendChild(div);
+    container.scrollTop = container.scrollHeight;
+    return div;
+}
+
+async function loadSuggestions() {
+    try {
+        const resp = await fetch('/ai/api/suggestions');
+        const data = await resp.json();
+        const container = document.getElementById('suggestions-container');
+
+        container.innerHTML = data.suggestions.map(s => `
+            <a href="${s.action}" class="d-block p-2 mb-2 rounded text-decoration-none" style="background:var(--bg-dark);border:1px solid var(--border-color);">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi ${s.icon}" style="color:var(--accent);"></i>
+                    <div>
+                        <small class="fw-bold d-block" style="color:var(--text);">${s.title}</small>
+                        <small class="text-muted">${s.description}</small>
+                    </div>
+                </div>
+            </a>
+        `).join('');
+    } catch (e) {
+        document.getElementById('suggestions-container').innerHTML = '<small class="text-muted">No se pudieron cargar</small>';
+    }
+}
+
+async function quickAnalyze() {
+    const asin = document.getElementById('quick-asin').value.trim();
+    if (!asin || asin.length !== 10) return;
+    const container = document.getElementById('quick-result');
+    container.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span></div>';
+
+    try {
+        const resp = await fetch(`/ai/api/explain/${asin}`);
+        const data = await resp.json();
+        container.innerHTML = `<div class="small" style="white-space:pre-wrap;">${data.explanation}</div>`;
+    } catch (e) {
+        container.innerHTML = '<small class="text-danger">Error</small>';
+    }
+}
+
+function explainConcept(concept) {
+    document.getElementById('chat-input').value = `Explicame que es "${concept}" en FBA Wholesale de forma simple`;
+    sendMessage();
+}
+
+// Load suggestions on page load
+loadSuggestions();
+</script>
+{% endblock %}

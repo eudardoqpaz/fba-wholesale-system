@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block title %}Buscar Productos - FBA System{% endblock %}
+{% block page_title %}Buscar Productos en Tiendas{% endblock %}
+
+{% block content %}
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-tab="search">
+            <i class="bi bi-search"></i> Buscar Productos
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-tab="accounts">
+            <i class="bi bi-building"></i> Cuentas Mayoristas
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-tab="strategy">
+            <i class="bi bi-lightbulb"></i> Estrategia
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- SEARCH TAB -->
+    <div class="tab-pane fade show active" id="tab-search">
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Buscar en Tiendas</h6></div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Tienda</label>
+                            <select class="form-select" id="store-select">
+                                {% for store in stores %}
+                                <option value="{{ store.id }}">{{ store.name }} {% if store.wholesale %}(Mayorista){% endif %}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">Buscar Producto</label>
+                            <input type="text" class="form-control" id="search-query"
+                                   placeholder="Ej: Tide detergent, LEGO set, Pampers..."
+                                   onkeypress="if(event.key==='Enter')searchStore()">
+                        </div>
+                        <button class="btn btn-warning w-100" onclick="searchStore()" id="search-btn">
+                            <i class="bi bi-search"></i> BUSCAR
+                        </button>
+                        <div class="mt-3">
+                            <h6 class="small fw-bold mb-2">Busquedas Populares:</h6>
+                            <div class="d-flex flex-wrap gap-1">
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Tide detergent')">Tide</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Pampers diapers')">Pampers</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('LEGO set')">LEGO</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Dove body wash')">Dove</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Charmin toilet paper')">Charmin</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Bounty paper towels')">Bounty</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Clorox wipes')">Clorox</button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="quickSearch('Rubbermaid containers')">Rubbermaid</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <h6 class="mb-0">Resultados</h6>
+                        <span id="results-count" class="badge bg-warning" style="display:none;"></span>
+                    </div>
+                    <div class="card-body" id="search-results">
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-shop" style="font-size:2rem;"></i><br>
+                            Selecciona una tienda y busca productos
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ACCOUNTS TAB -->
+    <div class="tab-pane fade" id="tab-accounts">
+        <div class="row g-3">
+            {% for store_id, info in store_info.items() %}
+            <div class="col-lg-6">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h6 class="mb-0">{{ info.name }}</h6>
+                        {% if info.wholesale %}
+                        <span class="badge bg-success">Mayorista</span>
+                        {% else %}
+                        <span class="badge bg-info">Retail/Arbitrage</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <div class="row mb-2">
+                            <div class="col-5"><small class="text-muted">Tipo:</small></div>
+                            <div class="col-7"><small class="fw-bold">{{ info.account_type }}</small></div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><small class="text-muted">Costo:</small></div>
+                            <div class="col-7"><small class="fw-bold text-warning">{{ info.membership_cost }}</small></div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-5"><small class="text-muted">Website:</small></div>
+                            <div class="col-7"><a href="{{ info.url }}" target="_blank" class="small text-info">{{ info.url }}</a></div>
+                        </div>
+
+                        <button class="btn btn-sm btn-outline-warning w-100 mt-2"
+                                onclick="showAccountInfo('{{ store_id }}')">
+                            <i class="bi bi-info-circle"></i> Como Abrir Cuenta
+                        </button>
+
+                        <div id="info-{{ store_id }}" class="mt-3" style="display:none;">
+                            <div class="p-3 rounded" style="background:var(--bg-dark);border:1px solid var(--border-color);">
+                                <pre style="white-space:pre-wrap;font-size:0.8rem;color:var(--text);margin:0;">{{ info.how_to_open }}</pre>
+                            </div>
+                            <h6 class="small fw-bold mt-2 mb-1">Tips:</h6>
+                            <ul class="small" style="color:var(--text2);">
+                                {% for tip in info.tips %}
+                                <li>{{ tip }}</li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <!-- STRATEGY TAB -->
+    <div class="tab-pane fade" id="tab-strategy">
+        <div class="card">
+            <div class="card-header"><h6 class="mb-0">Estrategia de Sourcing para Sterling, VA</h6></div>
+            <div class="card-body">
+                <h5 class="text-warning mb-3">Tu Plan de Accion - Semana por Semana</h5>
+
+                <div class="card mb-3 border-warning">
+                    <div class="card-body">
+                        <h6 class="text-warning">SEMANA 1: Visita Fisica</h6>
+                        <ol class="small">
+                            <li><strong>Costco Business Center (Chantilly, VA)</strong> - Visita y escanea productos con la app de Costco. Busca marcas conocidas en packs grandes.</li>
+                            <li><strong>Sam's Club</strong> - Usa "Scan & Go" en la app. Revisa la seccion de "Instant Savings".</li>
+                            <li><strong>Walmart</strong> - Busca CLEARANCE. Los precios de clearance en tienda pueden ser 50-90% mas baratos que Amazon.</li>
+                            <li><strong>Target</strong> - Busca clearance al 50-70%. Las mejores semanas son post-temporada.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-warning">SEMANA 2: Cuentas Online</h6>
+                        <ol class="small">
+                            <li><strong>Faire.com</strong> - Registrate como retailer. Explora marcas trending. Pide Net 60 terms.</li>
+                            <li><strong>Tundra.com</strong> - Registrate (gratis). Busca marcas directas con envio gratis.</li>
+                            <li><strong>Costco Online</strong> - Compara precios online vs tienda.</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-warning">SEMANA 3: Primeras Compras</h6>
+                        <ol class="small">
+                            <li>Selecciona 3-5 productos que analizaste con el Scanner</li>
+                            <li>Compra en la tienda/mas barata (Costco, Walmart clearance, etc.)</li>
+                            <li>Inversion: $300-$500 la primera compra</li>
+                            <li>Verifica que el producto se vende en Amazon a buen precio</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div class="card-body">
+                        <h6 class="text-warning">SEMANA 4+: Escalar</h6>
+                        <ol class="small">
+                            <li>Reinvierte ganancias en mas inventario</li>
+                            <li>Abre cuentas directas con marcas (mejor precio)</li>
+                            <li>Diversifica: mas tiendas, mas productos, mas categorias</li>
+                            <li>Usa el sistema para monitorear todo</li>
+                        </ol>
+                    </div>
+                </div>
+
+                <div class="alert alert-warning">
+                    <strong>REGLA DE ORO:</strong> Siempre verifica los numeros en el Scanner/Calculadora ANTES de comprar. 
+                    No compres porque "se ve barato" - compra porque los numeros dicen que es rentable.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Tab switching
+document.querySelectorAll('[data-bs-tab]').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
+        this.classList.add('active');
+        document.getElementById('tab-' + this.dataset.bsTab).classList.add('show', 'active');
+    });
+});
+
+async function searchStore() {
+    const store = document.getElementById('store-select').value;
+    const query = document.getElementById('search-query').value.trim();
+    if (!query) return;
+
+    const btn = document.getElementById('search-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Buscando...';
+
+    try {
+        const resp = await fetch('/stores/api/search', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({store, query, max_results: 20}),
+        });
+        const data = await resp.json();
+        renderResults(data.results, store);
+    } catch (err) {
+        document.getElementById('search-results').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-search"></i> BUSCAR';
+    }
+}
+
+function quickSearch(query) {
+    document.getElementById('search-query').value = query;
+    searchStore();
+}
+
+function renderResults(results, store) {
+    const container = document.getElementById('search-results');
+    const count = document.getElementById('results-count');
+    count.style.display = 'inline';
+    count.textContent = `${results.length} resultados`;
+
+    if (!results || results.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No se encontraron resultados.</div>';
+        return;
+    }
+
+    if (results[0]?.error) {
+        container.innerHTML = `<div class="alert alert-danger">${results[0].error}</div>`;
+        return;
+    }
+
+    if (results[0]?.message) {
+        container.innerHTML = `<div class="alert alert-info">${results[0].message}</div>`;
+        return;
+    }
+
+    let html = '<div class="row g-2">';
+    results.forEach(p => {
+        const discount = p.original_price > p.price ? Math.round((1 - p.price / p.original_price) * 100) : 0;
+        html += `
+            <div class="col-md-6">
+                <div class="card h-100">
+                    <div class="card-body p-2">
+                        <div class="d-flex gap-2">
+                            ${p.image_url ? `<img src="${p.image_url}" style="width:60px;height:60px;object-fit:contain;border-radius:6px;background:#fff;">` : ''}
+                            <div class="flex-grow-1">
+                                <small class="fw-bold d-block">${p.title?.substring(0, 80) || 'Sin titulo'}${p.title?.length > 80 ? '...' : ''}</small>
+                                <div class="d-flex align-items-center gap-2 mt-1">
+                                    <span class="text-warning fw-bold">$${p.price?.toFixed(2) || '?'}</span>
+                                    ${p.original_price > p.price ? `<small class="text-decoration-line-through text-muted">$${p.original_price?.toFixed(2)}</small>` : ''}
+                                    ${discount > 0 ? `<span class="badge bg-danger">-${discount}%</span>` : ''}
+                                </div>
+                                <small class="text-muted">${p.store || ''} ${p.brand ? '| ' + p.brand : ''}</small>
+                                ${p.url ? `<br><a href="${p.url}" target="_blank" class="small text-info">Ver en tienda</a>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+    });
+    html += '</div>';
+    container.innerHTML = html;
+}
+
+function showAccountInfo(storeId) {
+    const el = document.getElementById('info-' + storeId);
+    el.style.display = el.style.display === 'none' ? 'block' : 'none';
+}
+</script>
+{% endblock %}

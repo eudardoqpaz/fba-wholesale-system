@@ -1,0 +1,218 @@
+{% extends "base.html" %}
+{% block title %}Inventario - FBA System{% endblock %}
+{% block page_title %}Gestion de Inventario{% endblock %}
+
+{% block content %}
+<!-- Summary Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <p class="text-muted mb-1">Total SKUs</p>
+                <h3>{{ items|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <p class="text-muted mb-1">En Stock</p>
+                <h3 class="text-success">{{ items|selectattr('status', 'equalto', 'in_stock')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <p class="text-muted mb-1">Stock Bajo</p>
+                <h3 class="text-warning">{{ items|selectattr('status', 'equalto', 'low_stock')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card stat-card">
+            <div class="card-body text-center">
+                <p class="text-muted mb-1">Sin Stock</p>
+                <h3 class="text-danger">{{ items|selectattr('status', 'equalto', 'out_of_stock')|list|length }}</h3>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Actions -->
+<div class="d-flex justify-content-between mb-3">
+    <button class="btn btn-sm btn-warning" onclick="checkReorder()">
+        <i class="bi bi-arrow-repeat"></i> Verificar Reorden
+    </button>
+    <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#updateInventoryModal">
+        <i class="bi bi-pencil"></i> Actualizar Inventario
+    </button>
+</div>
+
+<!-- Inventory Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Producto</th>
+                        <th>FBA</th>
+                        <th>Inbound</th>
+                        <th>Local</th>
+                        <th>Reorder Point</th>
+                        <th>Costo/Unit</th>
+                        <th>Invertido</th>
+                        <th>Dias Stock</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>
+                            <small class="fw-bold">{{ item.product.title[:40] if item.product else 'N/A' }}</small>
+                            <br><code class="small">{{ item.product.asin if item.product else '' }}</code>
+                        </td>
+                        <td class="fw-bold">{{ item.quantity_fba }}</td>
+                        <td>{{ item.quantity_inbound }}</td>
+                        <td>{{ item.quantity_local }}</td>
+                        <td>{{ item.reorder_point }}</td>
+                        <td>${{ "%.2f"|format(item.avg_cost) }}</td>
+                        <td>${{ "%.2f"|format(item.total_invested) }}</td>
+                        <td>{{ item.days_of_stock if item.days_of_stock > 0 else '-' }}</td>
+                        <td>
+                            {% if item.status == 'in_stock' %}
+                            <span class="badge bg-success">En Stock</span>
+                            {% elif item.status == 'low_stock' %}
+                            <span class="badge bg-warning text-dark">Stock Bajo</span>
+                            {% elif item.status == 'out_of_stock' %}
+                            <span class="badge bg-danger">Sin Stock</span>
+                            {% elif item.status == 'overstock' %}
+                            <span class="badge bg-info">Sobrestock</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="9" class="text-center text-muted py-4">Sin registros de inventario. Agrega productos primero.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Reorder Results -->
+<div id="reorder-results" class="mt-3" style="display:none;"></div>
+
+<!-- Update Inventory Modal -->
+<div class="modal fade" id="updateInventoryModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Actualizar Inventario</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">Producto</label>
+                    <select class="form-select" id="inv-product">
+                        {% for p in products_no_inv %}
+                        <option value="{{ p.id }}">{{ p.asin }} - {{ p.title[:40] }}</option>
+                        {% endfor %}
+                        {% for item in items %}
+                        <option value="{{ item.product_id }}">{{ item.product.asin if item.product else '' }} - {{ item.product.title[:40] if item.product else '' }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="row g-2">
+                    <div class="col-4">
+                        <label class="form-label small">FBA Qty</label>
+                        <input type="number" class="form-control form-control-sm" id="inv-fba" value="0">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small">Inbound Qty</label>
+                        <input type="number" class="form-control form-control-sm" id="inv-inbound" value="0">
+                    </div>
+                    <div class="col-4">
+                        <label class="form-label small">Local Qty</label>
+                        <input type="number" class="form-control form-control-sm" id="inv-local" value="0">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Reorder Point</label>
+                        <input type="number" class="form-control form-control-sm" id="inv-reorder-pt" value="10">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small">Reorder Qty</label>
+                        <input type="number" class="form-control form-control-sm" id="inv-reorder-qty" value="50">
+                    </div>
+                    <div class="col-12">
+                        <label class="form-label small">Costo Promedio ($)</label>
+                        <input type="number" class="form-control form-control-sm" id="inv-cost" step="0.01" value="0">
+                    </div>
+                </div>
+                <button class="btn btn-warning w-100 mt-3" onclick="updateInventory()">Guardar</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function updateInventory() {
+    const data = {
+        product_id: parseInt(document.getElementById('inv-product').value),
+        quantity_fba: parseInt(document.getElementById('inv-fba').value) || 0,
+        quantity_inbound: parseInt(document.getElementById('inv-inbound').value) || 0,
+        quantity_local: parseInt(document.getElementById('inv-local').value) || 0,
+        reorder_point: parseInt(document.getElementById('inv-reorder-pt').value) || 10,
+        reorder_quantity: parseInt(document.getElementById('inv-reorder-qty').value) || 50,
+        avg_cost: parseFloat(document.getElementById('inv-cost').value) || 0,
+    };
+    const resp = await fetch('/inventory/api/update', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data),
+    });
+    if (resp.ok) {
+        location.reload();
+    } else {
+        alert('Error al actualizar');
+    }
+}
+
+async function checkReorder() {
+    const resp = await fetch('/inventory/api/reorder-check');
+    const data = await resp.json();
+    const container = document.getElementById('reorder-results');
+    container.style.display = 'block';
+
+    if (data.reorder_needed.length === 0) {
+        container.innerHTML = '<div class="alert alert-success">Todos los productos tienen stock suficiente.</div>';
+        return;
+    }
+
+    let html = `
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark"><h6 class="mb-0">Productos que Necesitan Reorden (${data.total_items})</h6></div>
+            <div class="card-body p-0">
+                <table class="table table-sm mb-0">
+                    <thead><tr><th>Producto</th><th>Stock Actual</th><th>Sugerido</th><th>Costo Est.</th></tr></thead>
+                    <tbody>
+    `;
+    data.reorder_needed.forEach(r => {
+        html += `<tr>
+            <td><small>${r.title}</small><br><code>${r.asin}</code></td>
+            <td class="text-danger fw-bold">${r.current_stock}</td>
+            <td>${r.suggested_order}</td>
+            <td>$${r.estimated_cost.toFixed(2)}</td>
+        </tr>`;
+    });
+    html += `</tbody></table>
+        <div class="card-footer"><strong>Total estimado: $${data.estimated_total_cost.toFixed(2)}</strong></div>
+    </div></div>`;
+    container.innerHTML = html;
+}
+</script>
+{% endblock %}

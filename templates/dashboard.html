@@ -1,0 +1,171 @@
+{% extends "base.html" %}
+{% block title %}Dashboard - FBA System{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<!-- Stats Cards -->
+<div class="row g-3 mb-4">
+    <div class="col-md-3 col-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Productos Activos</p>
+                        <h3 class="mb-0">{{ total_products }}</h3>
+                    </div>
+                    <div class="stat-icon bg-primary"><i class="bi bi-grid"></i></div>
+                </div>
+                <small class="text-success"><i class="bi bi-check-circle"></i> {{ profitable_count }} rentables</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Unidades FBA</p>
+                        <h3 class="mb-0">{{ total_fba_units }}</h3>
+                    </div>
+                    <div class="stat-icon bg-success"><i class="bi bi-box-seam"></i></div>
+                </div>
+                <small class="text-muted">Invertido: ${{ "%.2f"|format(total_invested) }}</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Proveedores</p>
+                        <h3 class="mb-0">{{ active_suppliers }}</h3>
+                    </div>
+                    <div class="stat-icon bg-info"><i class="bi bi-building"></i></div>
+                </div>
+                <small class="text-muted">{{ open_pos }} POs abiertos</small>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3 col-6">
+        <div class="card stat-card">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <p class="text-muted mb-1">Alertas</p>
+                        <h3 class="mb-0">{{ alerts|length }}</h3>
+                    </div>
+                    <div class="stat-icon bg-warning"><i class="bi bi-bell"></i></div>
+                </div>
+                <small class="text-danger"><i class="bi bi-exclamation-triangle"></i> {{ out_of_stock }} sin stock</small>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3">
+    <!-- Top Products -->
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h6 class="mb-0">Top Productos por ROI</h6>
+                <a href="/products" class="btn btn-sm btn-outline-warning">Ver Todos</a>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead>
+                            <tr>
+                                <th>Producto</th>
+                                <th>Precio</th>
+                                <th>Costo</th>
+                                <th>ROI</th>
+                                <th>Ganancia</th>
+                                <th>BSR</th>
+                                <th>Sellers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for p in top_products %}
+                            <tr>
+                                <td>
+                                    <div class="d-flex align-items-center">
+                                        {% if p.image_url %}
+                                        <img src="{{ p.image_url }}" class="product-thumb me-2" alt="">
+                                        {% endif %}
+                                        <div>
+                                            <small class="fw-bold">{{ p.title[:45] }}{% if p.title|length > 45 %}...{% endif %}</small>
+                                            <br><small class="text-muted">{{ p.asin }}</small>
+                                        </div>
+                                    </div>
+                                </td>
+                                <td>${{ "%.2f"|format(p.amazon_price) }}</td>
+                                <td>${{ "%.2f"|format(p.best_supplier_price or 0) }}</td>
+                                <td><span class="badge {% if p.roi >= 25 %}bg-success{% elif p.roi >= 15 %}bg-warning{% else %}bg-danger{% endif %}">{{ p.roi }}%</span></td>
+                                <td class="text-success">${{ "%.2f"|format(p.net_profit) }}</td>
+                                <td>{{ "{:,}".format(p.bsr) if p.bsr > 0 else "N/A" }}</td>
+                                <td>{{ p.fba_seller_count }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="7" class="text-center text-muted py-4">No hay productos. Agrega productos desde el Scanner o la pagina de Productos.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alerts -->
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-bell"></i> Alertas Recientes</h6>
+            </div>
+            <div class="card-body">
+                {% for alert in alerts %}
+                <div class="alert-item alert-{{ alert.severity }}">
+                    <small class="fw-bold">{{ alert.alert_type|upper }}</small>
+                    <p class="mb-0 small">{{ alert.message }}</p>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-3">Sin alertas</p>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Quick Actions -->
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-lightning"></i> Acciones Rapidas</h6>
+            </div>
+            <div class="card-body d-grid gap-2">
+                <a href="/scanner" class="btn btn-outline-warning">
+                    <i class="bi bi-search"></i> Escanear Price List
+                </a>
+                <a href="/products" class="btn btn-outline-primary">
+                    <i class="bi bi-plus-circle"></i> Agregar Producto
+                </a>
+                <a href="/inventory" class="btn btn-outline-success">
+                    <i class="bi bi-boxes"></i> Ver Inventario
+                </a>
+                <button class="btn btn-outline-info" onclick="openCalculator()">
+                    <i class="bi bi-calculator"></i> Calculadora
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% if low_stock > 0 %}
+<!-- Reorder Alert -->
+<div class="card mt-3 border-warning">
+    <div class="card-header bg-warning text-dark">
+        <h6 class="mb-0"><i class="bi bi-exclamation-triangle"></i> Productos que Necesitan Reorden</h6>
+    </div>
+    <div class="card-body">
+        <p>{{ low_stock }} productos con stock bajo. Revisa la pagina de <a href="/inventory">Inventario</a> para detalles.</p>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

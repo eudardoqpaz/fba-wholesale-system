@@ -1,0 +1,436 @@
+{% extends "base.html" %}
+{% block title %}Scanner - FBA System{% endblock %}
+{% block page_title %}Product Scanner{% endblock %}
+
+{% block content %}
+<!-- Tabs -->
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item">
+        <button class="nav-link active" data-bs-toggle="tab" data-bs-tab="finder">
+            <i class="bi bi-search"></i> Product Finder (Keepa)
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-tab="csv">
+            <i class="bi bi-upload"></i> Escanear CSV
+        </button>
+    </li>
+    <li class="nav-item">
+        <button class="nav-link" data-bs-toggle="tab" data-bs-tab="bestsellers">
+            <i class="bi bi-trophy"></i> Best Sellers
+        </button>
+    </li>
+</ul>
+
+<div class="tab-content">
+    <!-- PRODUCT FINDER TAB -->
+    <div class="tab-pane fade show active" id="tab-finder">
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Buscar Productos en Keepa</h6></div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Categoria</label>
+                            <select class="form-select" id="finder-category">
+                                <option value="">Todas las categorias</option>
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-6">
+                                <label class="form-label small">Precio Min ($)</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-min-price" value="15">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Precio Max ($)</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-max-price" value="100">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Max BSR</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-max-bsr" value="50000">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Max Sellers FBA</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-max-sellers" value="15">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Min Monthly Sales</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-min-sales" value="30">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Min Reviews</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-min-reviews" value="50">
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Ordenar por</label>
+                                <select class="form-select form-select-sm" id="finder-sort">
+                                    <option value="bsr">Menor BSR</option>
+                                    <option value="sales">Mas Vendidos</option>
+                                    <option value="price_low">Menor Precio</option>
+                                    <option value="reviews">Mas Reviews</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label small">Max Resultados</label>
+                                <input type="number" class="form-control form-control-sm" id="finder-limit" value="50" max="200">
+                            </div>
+                        </div>
+                        <div class="form-check mt-2">
+                            <input class="form-check-input" type="checkbox" id="finder-exclude-amz" checked>
+                            <label class="form-check-label small">Excluir productos donde Amazon vende</label>
+                        </div>
+                        <button class="btn btn-warning w-100 mt-3" id="finder-btn" onclick="runFinder()">
+                            <i class="bi bi-search"></i> BUSCAR PRODUCTOS
+                        </button>
+                        <div class="small text-muted mt-2">
+                            <i class="bi bi-info-circle"></i> Token cost: ~11 tokens base + data. Starter plan (20 tok/min).
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between">
+                        <h6 class="mb-0">Resultados</h6>
+                        <span id="finder-count" class="badge bg-warning" style="display:none;"></span>
+                    </div>
+                    <div class="card-body" id="finder-results">
+                        <div class="text-center text-muted py-5">
+                            <i class="bi bi-search" style="font-size:2rem;"></i><br>
+                            Configura los filtros y busca productos ganadores
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- CSV SCAN TAB -->
+    <div class="tab-pane fade" id="tab-csv">
+        <div class="row g-3">
+            <div class="col-lg-5">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Escanear Price List CSV</h6></div>
+                    <div class="card-body">
+                        <form id="scan-form" enctype="multipart/form-data">
+                            <div class="mb-3">
+                                <label class="form-label">Archivo CSV</label>
+                                <input type="file" class="form-control" id="scan-file" accept=".csv" required>
+                                <div class="form-text">Columnas: ASIN, Cost (+ SKU opcional)</div>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Proveedor</label>
+                                <select class="form-select" id="scan-supplier">
+                                    <option value="">-- Seleccionar --</option>
+                                    {% for s in suppliers %}
+                                    <option value="{{ s.id }}">{{ s.name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-6">
+                                    <label class="form-label small">ROI Min (%)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scan-min-roi" value="15">
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label small">Ganancia Min ($)</label>
+                                    <input type="number" class="form-control form-control-sm" id="scan-min-profit" value="2.50" step="0.50">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-warning w-100 mt-3" id="scan-btn">
+                                <i class="bi bi-upload"></i> ESCANEAR CSV
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Resultados del Escaneo</h6></div>
+                    <div class="card-body" id="scan-results">
+                        <div class="text-center text-muted py-5">Sube un CSV para comenzar</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BEST SELLERS TAB -->
+    <div class="tab-pane fade" id="tab-bestsellers">
+        <div class="row g-3">
+            <div class="col-lg-4">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Explorar Best Sellers</h6></div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">Categoria</label>
+                            <select class="form-select" id="bs-category">
+                                {% for cat in categories %}
+                                <option value="{{ cat.id }}">{{ cat.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label small">Limite de productos</label>
+                            <input type="number" class="form-control form-control-sm" id="bs-limit" value="30" max="100">
+                        </div>
+                        <button class="btn btn-warning w-100" onclick="loadBestSellers()">
+                            <i class="bi bi-trophy"></i> CARGAR BEST SELLERS
+                        </button>
+                        <div class="small text-muted mt-2">Cost: 50 tokens</div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-8">
+                <div class="card">
+                    <div class="card-header"><h6 class="mb-0">Top Productos por Categoria</h6></div>
+                    <div class="card-body" id="bs-results">
+                        <div class="text-center text-muted py-5">Selecciona una categoria</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Recent Scans -->
+<div class="card mt-3">
+    <div class="card-header"><h6 class="mb-0">Escaneos Recientes</h6></div>
+    <div class="card-body p-0">
+        <div class="list-group list-group-flush">
+            {% for scan in recent_scans %}
+            <div class="list-group-item d-flex justify-content-between align-items-center">
+                <div>
+                    <small class="fw-bold">{{ scan.scan_name }}</small>
+                    <small class="text-muted ms-2">{{ scan.total_products_scanned }} productos</small>
+                </div>
+                <span class="badge bg-success">{{ scan.profitable_found }} rentables</span>
+            </div>
+            {% else %}
+            <div class="list-group-item text-center text-muted">Sin escaneos previos</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Tab switching
+document.querySelectorAll('[data-bs-tab]').forEach(btn => {
+    btn.addEventListener('click', function() {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('show', 'active'));
+        this.classList.add('active');
+        document.getElementById('tab-' + this.dataset.bsTab).classList.add('show', 'active');
+    });
+});
+
+// ─── Product Finder ───
+async function runFinder() {
+    const btn = document.getElementById('finder-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Buscando...';
+
+    const data = {
+        root_category: parseInt(document.getElementById('finder-category').value) || null,
+        min_price: parseFloat(document.getElementById('finder-min-price').value),
+        max_price: parseFloat(document.getElementById('finder-max-price').value),
+        max_bsr: parseInt(document.getElementById('finder-max-bsr').value),
+        max_fba_sellers: parseInt(document.getElementById('finder-max-sellers').value),
+        min_monthly_sales: parseInt(document.getElementById('finder-min-sales').value),
+        min_reviews: parseInt(document.getElementById('finder-min-reviews').value),
+        exclude_amazon: document.getElementById('finder-exclude-amz').checked,
+        sort_by: document.getElementById('finder-sort').value,
+        max_results: parseInt(document.getElementById('finder-limit').value),
+    };
+
+    try {
+        const resp = await fetch('/scanner/api/finder', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(data),
+        });
+        const result = await resp.json();
+
+        if (result.error) {
+            document.getElementById('finder-results').innerHTML = `<div class="alert alert-danger">${result.error}</div>`;
+        } else {
+            renderFinderResults(result);
+        }
+    } catch (err) {
+        document.getElementById('finder-results').innerHTML = `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-search"></i> BUSCAR PRODUCTOS';
+    }
+}
+
+function renderFinderResults(data) {
+    const container = document.getElementById('finder-results');
+    const count = document.getElementById('finder-count');
+    count.style.display = 'inline';
+    count.textContent = `${data.total_found} encontrados`;
+
+    if (!data.products || data.products.length === 0) {
+        container.innerHTML = '<div class="alert alert-warning">No se encontraron productos con esos criterios.</div>';
+        return;
+    }
+
+    const asins = [];
+    let html = `<p class="small text-muted mb-3">${data.products.length} productos analizados. Ganancia calculada sin precio de proveedor.</p>`;
+
+    data.products.forEach(p => {
+        const roi = p.calc?.roi_pct || 0;
+        const profit = p.calc?.net_profit || 0;
+        const badge = roi >= 20 ? 'success' : roi >= 10 ? 'warning' : 'secondary';
+        asins.push(p.asin);
+
+        html += `
+            <div class="scan-result-card mb-2">
+                <div class="d-flex justify-content-between align-items-start">
+                    <div class="d-flex gap-2">
+                        ${p.image_url ? `<img src="${p.image_url}" style="width:40px;height:40px;object-fit:contain;border-radius:6px;background:#fff;">` : ''}
+                        <div>
+                            <code class="small">${p.asin}</code>
+                            <span class="badge bg-${badge} ms-1">${p.sell_price ? '$'+p.sell_price.toFixed(2) : '?'}</span>
+                            <p class="mb-0 small fw-bold">${p.title?.substring(0, 65) || 'Unknown'}${p.title?.length > 65 ? '...' : ''}</p>
+                            <small class="text-muted">
+                                BSR: ${p.bsr?.toLocaleString() || 'N/A'} |
+                                Sellers: ${p.fba_seller_count || '?'} |
+                                Sales/mo: ${p.monthly_sales_est || '?'} |
+                                Reviews: ${p.review_count || 0} |
+                                FBA Fee: $${p.fba_fee?.toFixed(2) || '?'}
+                                ${p.is_amazon_seller ? ' | <span class="text-danger">AMZ</span>' : ''}
+                            </small>
+                        </div>
+                    </div>
+                    <button class="btn btn-sm btn-outline-warning" onclick="addProduct('${p.asin}', this)">+ Agregar</button>
+                </div>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+    window._finderAsins = asins;
+}
+
+async function addProduct(asin, btn) {
+    btn.disabled = true;
+    btn.textContent = 'Agregando...';
+    try {
+        const resp = await fetch('/scanner/api/add-to-products', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify([asin]),
+        });
+        const data = await resp.json();
+        if (data.added > 0) {
+            btn.textContent = 'Agregado';
+            btn.classList.remove('btn-outline-warning');
+            btn.classList.add('btn-success');
+        } else {
+            btn.textContent = 'Ya existe';
+        }
+    } catch (e) {
+        btn.textContent = 'Error';
+    }
+}
+
+// ─── CSV Scan ───
+document.getElementById('scan-form').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const file = document.getElementById('scan-file').files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('supplier_id', document.getElementById('scan-supplier').value || '');
+    formData.append('min_roi', document.getElementById('scan-min-roi').value);
+    formData.append('min_profit', document.getElementById('scan-min-profit').value);
+
+    const btn = document.getElementById('scan-btn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Escaneando...';
+
+    try {
+        const resp = await fetch('/scanner/api/scan', {method: 'POST', body: formData});
+        const data = await resp.json();
+        if (resp.ok) renderScanResults(data);
+        else document.getElementById('scan-results').innerHTML = `<div class="alert alert-danger">${data.detail || 'Error'}</div>`;
+    } catch (err) {
+        document.getElementById('scan-results').innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<i class="bi bi-upload"></i> ESCANEAR CSV';
+    }
+});
+
+function renderScanResults(data) {
+    const s = data.stats;
+    let html = `
+        <div class="row g-2 mb-3">
+            <div class="col-3"><div class="text-center p-2 bg-success bg-opacity-10 rounded"><h5 class="text-success mb-0">${s.profitable_found}</h5><small>Rentables</small></div></div>
+            <div class="col-3"><div class="text-center p-2 bg-warning bg-opacity-10 rounded"><h5 class="text-warning mb-0">${s.marginal_found}</h5><small>Marginales</small></div></div>
+            <div class="col-3"><div class="text-center p-2 bg-danger bg-opacity-10 rounded"><h5 class="text-danger mb-0">${s.not_profitable_count}</h5><small>No rent.</small></div></div>
+            <div class="col-3"><div class="text-center p-2 bg-info bg-opacity-10 rounded"><h5 class="text-info mb-0">${s.avg_roi}%</h5><small>ROI Prom</small></div></div>
+        </div>`;
+
+    data.profitable.forEach(p => {
+        html += `
+            <div class="scan-result-card mb-2">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <code>${p.asin}</code> <span class="badge bg-success">${p.roi_pct}% ROI</span>
+                        <p class="mb-0 small">${p.title?.substring(0, 60) || ''}</p>
+                        <small class="text-muted">BSR: ${p.bsr?.toLocaleString()} | Sellers: ${p.fba_seller_count}</small>
+                    </div>
+                    <div class="text-end">
+                        <div class="text-success fw-bold">$${p.net_profit?.toFixed(2)}</div>
+                        <small class="text-muted">$${p.sell_price?.toFixed(2)} vs $${p.buy_price?.toFixed(2)}</small>
+                    </div>
+                </div>
+            </div>`;
+    });
+
+    document.getElementById('scan-results').innerHTML = html;
+}
+
+// ─── Best Sellers ───
+async function loadBestSellers() {
+    const cat = document.getElementById('bs-category').value;
+    const limit = document.getElementById('bs-limit').value;
+    const container = document.getElementById('bs-results');
+    container.innerHTML = '<div class="text-center"><span class="spinner-border spinner-border-sm"></span> Cargando...</div>';
+
+    try {
+        const resp = await fetch(`/scanner/api/bestsellers/${cat}?limit=${limit}`);
+        const data = await resp.json();
+
+        if (!data.products || data.products.length === 0) {
+            container.innerHTML = '<div class="alert alert-warning">Sin resultados</div>';
+            return;
+        }
+
+        let html = `<p class="small text-muted mb-3">${data.total} best sellers cargados</p><div class="table-responsive"><table class="table table-hover table-sm"><thead><tr><th>#</th><th>Producto</th><th>Precio</th><th>BSR</th><th>Sellers</th><th>Sales/mo</th></tr></thead><tbody>`;
+        data.products.forEach((p, i) => {
+            html += `<tr>
+                <td>${i + 1}</td>
+                <td><small class="fw-bold">${p.title?.substring(0, 50) || ''}</small><br><code class="small">${p.asin}</code></td>
+                <td>$${p.sell_price?.toFixed(2) || '?'}</td>
+                <td>${p.bsr?.toLocaleString() || 'N/A'}</td>
+                <td>${p.fba_seller_count || '?'}</td>
+                <td>${p.monthly_sales_est || '?'}</td>
+            </tr>`;
+        });
+        html += '</tbody></table></div>';
+        container.innerHTML = html;
+    } catch (err) {
+        container.innerHTML = `<div class="alert alert-danger">${err.message}</div>`;
+    }
+}
+</script>
+{% endblock %}

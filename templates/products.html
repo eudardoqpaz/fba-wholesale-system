@@ -1,0 +1,192 @@
+{% extends "base.html" %}
+{% block title %}Productos - FBA System{% endblock %}
+{% block page_title %}Productos{% endblock %}
+
+{% block content %}
+<!-- Actions Bar -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex gap-2">
+        <input type="text" class="form-control form-control-sm" id="search-products" placeholder="Buscar ASIN, titulo, marca..." style="width:250px;">
+        <select class="form-select form-select-sm" id="sort-products" style="width:150px;">
+            <option value="roi">Mayor ROI</option>
+            <option value="profit">Mayor Ganancia</option>
+            <option value="price">Mayor Precio</option>
+            <option value="bsr">Menor BSR</option>
+            <option value="newest">Mas Recientes</option>
+        </select>
+    </div>
+    <button class="btn btn-warning btn-sm" data-bs-toggle="modal" data-bs-target="#addProductModal">
+        <i class="bi bi-plus-circle"></i> Agregar Producto
+    </button>
+</div>
+
+<!-- Products Table -->
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0" id="products-table">
+                <thead>
+                    <tr>
+                        <th></th>
+                        <th>ASIN</th>
+                        <th>Producto</th>
+                        <th>Precio Amazon</th>
+                        <th>Costo</th>
+                        <th>ROI</th>
+                        <th>Ganancia</th>
+                        <th>BSR</th>
+                        <th>Sellers</th>
+                        <th>Status</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody id="products-tbody">
+                    {% for p in products %}
+                    <tr data-id="{{ p.id }}" data-asin="{{ p.asin }}">
+                        <td>
+                            {% if p.image_url %}
+                            <img src="{{ p.image_url }}" class="product-thumb" alt="">
+                            {% else %}
+                            <div class="product-thumb-placeholder"><i class="bi bi-image"></i></div>
+                            {% endif %}
+                        </td>
+                        <td><code>{{ p.asin }}</code></td>
+                        <td>
+                            <div class="product-title">{{ p.title[:55] }}{% if p.title|length > 55 %}...{% endif %}</div>
+                            <small class="text-muted">{{ p.brand }}</small>
+                        </td>
+                        <td class="fw-bold">${{ "%.2f"|format(p.amazon_price) }}</td>
+                        <td>${{ "%.2f"|format(p.best_supplier_price or 0) }}</td>
+                        <td>
+                            <span class="badge {% if p.roi >= 25 %}bg-success{% elif p.roi >= 15 %}bg-warning text-dark{% elif p.roi > 0 %}bg-danger{% else %}bg-secondary{% endif %}">
+                                {{ p.roi }}%
+                            </span>
+                        </td>
+                        <td class="{% if p.net_profit > 0 %}text-success{% else %}text-danger{% endif %}">
+                            ${{ "%.2f"|format(p.net_profit) }}
+                        </td>
+                        <td>{{ "{:,}".format(p.bsr) if p.bsr > 0 else "-" }}</td>
+                        <td>
+                            {{ p.fba_seller_count }}
+                            {% if p.is_amazon_seller %}<span class="badge bg-danger ms-1">AMZ</span>{% endif %}
+                        </td>
+                        <td><span class="badge bg-{{ 'success' if p.status == 'active' else 'secondary' }}">{{ p.status }}</span></td>
+                        <td>
+                            <div class="btn-group btn-group-sm">
+                                <button class="btn btn-outline-info" onclick="refreshProduct({{ p.id }})" title="Refresh"><i class="bi bi-arrow-clockwise"></i></button>
+                                <button class="btn btn-outline-danger" onclick="deleteProduct({{ p.id }})" title="Eliminar"><i class="bi bi-trash"></i></button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="11" class="text-center text-muted py-5">
+                        <i class="bi bi-inbox" style="font-size:2rem;"></i><br>
+                        No hay productos agregados.<br>
+                        <small>Usa el Scanner para encontrar productos o agregalos manualmente.</small>
+                    </td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Add Product Modal -->
+<div class="modal fade" id="addProductModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Agregar Producto</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <div class="mb-3">
+                    <label class="form-label">ASIN de Amazon</label>
+                    <input type="text" class="form-control" id="new-asin" placeholder="B08N5WRWNW" maxlength="10">
+                </div>
+                <button class="btn btn-warning w-100" onclick="addProduct()">
+                    <i class="bi bi-plus-circle"></i> Buscar y Agregar
+                </button>
+                <div id="add-result" class="mt-3"></div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadProducts() {
+    const search = document.getElementById('search-products').value;
+    const sort = document.getElementById('sort-products').value;
+    const resp = await fetch(`/products/api/list?search=${search}&sort_by=${sort}`);
+    const data = await resp.json();
+    renderProducts(data.products);
+}
+
+function renderProducts(products) {
+    const tbody = document.getElementById('products-tbody');
+    if (products.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="11" class="text-center text-muted py-5">No se encontraron productos</td></tr>';
+        return;
+    }
+    tbody.innerHTML = products.map(p => `
+        <tr data-id="${p.id}">
+            <td>${p.image_url ? `<img src="${p.image_url}" class="product-thumb">` : '<div class="product-thumb-placeholder"><i class="bi bi-image"></i></div>'}</td>
+            <td><code>${p.asin}</code></td>
+            <td><div class="product-title">${p.title?.substring(0,55) || ''}${p.title?.length > 55 ? '...' : ''}</div><small class="text-muted">${p.brand || ''}</small></td>
+            <td class="fw-bold">$${p.amazon_price?.toFixed(2) || '0.00'}</td>
+            <td>$${p.best_supplier_price?.toFixed(2) || 'N/A'}</td>
+            <td><span class="badge ${p.roi >= 25 ? 'bg-success' : p.roi >= 15 ? 'bg-warning text-dark' : p.roi > 0 ? 'bg-danger' : 'bg-secondary'}">${p.roi}%</span></td>
+            <td class="${p.net_profit > 0 ? 'text-success' : 'text-danger'}">$${p.net_profit?.toFixed(2) || '0.00'}</td>
+            <td>${p.bsr > 0 ? p.bsr.toLocaleString() : '-'}</td>
+            <td>${p.fba_seller_count} ${p.is_amazon_seller ? '<span class="badge bg-danger ms-1">AMZ</span>' : ''}</td>
+            <td><span class="badge bg-${p.status === 'active' ? 'success' : 'secondary'}">${p.status}</span></td>
+            <td><div class="btn-group btn-group-sm">
+                <button class="btn btn-outline-info" onclick="refreshProduct(${p.id})"><i class="bi bi-arrow-clockwise"></i></button>
+                <button class="btn btn-outline-danger" onclick="deleteProduct(${p.id})"><i class="bi bi-trash"></i></button>
+            </div></td>
+        </tr>
+    `).join('');
+}
+
+async function addProduct() {
+    const asin = document.getElementById('new-asin').value.trim();
+    if (!asin || asin.length !== 10) {
+        showResult('add-result', 'Ingresa un ASIN valido de 10 caracteres', 'danger');
+        return;
+    }
+    const resp = await fetch('/products/api/add', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({asin: asin}),
+    });
+    const data = await resp.json();
+    if (resp.ok) {
+        showResult('add-result', `Producto ${data.asin} agregado exitosamente!`, 'success');
+        setTimeout(() => location.reload(), 1000);
+    } else {
+        showResult('add-result', data.detail || 'Error al agregar', 'danger');
+    }
+}
+
+async function refreshProduct(id) {
+    const resp = await fetch(`/products/api/${id}/refresh`, {method: 'POST'});
+    if (resp.ok) location.reload();
+}
+
+async function deleteProduct(id) {
+    if (!confirm('Eliminar este producto?')) return;
+    await fetch(`/products/api/${id}`, {method: 'DELETE'});
+    location.reload();
+}
+
+function showResult(elementId, msg, type) {
+    document.getElementById(elementId).innerHTML = `<div class="alert alert-${type}">${msg}</div>`;
+}
+
+// Event listeners
+document.getElementById('search-products')?.addEventListener('input', debounce(loadProducts, 300));
+document.getElementById('sort-products')?.addEventListener('change', loadProducts);
+</script>
+{% endblock %}
