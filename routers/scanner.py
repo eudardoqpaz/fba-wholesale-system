@@ -49,29 +49,54 @@ class StoreSearchQuery(BaseModel):
 @router.get("/", response_class=HTMLResponse)
 async def scanner_page(request: Request, db: AsyncSession = Depends(get_db)):
     """Scanner page with both CSV upload and Product Finder."""
+    from services.eligibility import eligibility_service, AMAZON_CATEGORIES
+
     result = await db.execute(select(Supplier).where(Supplier.status == "active"))
     suppliers = result.scalars().all()
 
     scans_result = await db.execute(select(ScanResult).order_by(ScanResult.created_at.desc()).limit(10))
     recent_scans = scans_result.scalars().all()
 
-    categories = [
-        {"id": 1055398, "name": "Home & Kitchen"},
-        {"id": 165796011, "name": "Tools & Home Improvement"},
-        {"id": 2619533011, "name": "Sports & Outdoors"},
-        {"id": 283155, "name": "Books"},
-        {"id": 3760911, "name": "Health & Household"},
-        {"id": 16310101, "name": "Beauty & Personal Care"},
-        {"id": 2617941011, "name": "Toys & Games"},
-        {"id": 3375251, "name": "Pet Supplies"},
-        {"id": 2238192011, "name": "Office Products"},
-        {"id": 15684181, "name": "Baby Products"},
-        {"id": 172282, "name": "Electronics"},
-        {"id": 281052, "name": "Camera & Photo"},
-        {"id": 599676, "name": "Automotive"},
-        {"id": 11091801, "name": "Grocery & Gourmet Food"},
-        {"id": 3375301, "name": "Patio, Lawn & Garden"},
-    ]
+    # Get approved categories from settings
+    approved_cats = await eligibility_service.get_approved_categories(db)
+
+    # Map eligibility category IDs to Keepa category IDs
+    eligibility_to_keepa = {
+        "home_kitchen": {"id": 1055398, "name": "Home & Kitchen"},
+        "tools_home_improvement": {"id": 165796011, "name": "Tools & Home Improvement"},
+        "sports_outdoors": {"id": 2619533011, "name": "Sports & Outdoors"},
+        "health_household": {"id": 3760911, "name": "Health & Household"},
+        "beauty": {"id": 16310101, "name": "Beauty & Personal Care"},
+        "toys_games": {"id": 2617941011, "name": "Toys & Games"},
+        "pet_supplies": {"id": 3375251, "name": "Pet Supplies"},
+        "office_products": {"id": 2238192011, "name": "Office Products"},
+        "baby": {"id": 15684181, "name": "Baby Products"},
+        "electronics": {"id": 172282, "name": "Electronics"},
+        "automotive": {"id": 599676, "name": "Automotive"},
+        "grocery": {"id": 11091801, "name": "Grocery & Gourmet Food"},
+        "clothing": {"id": 15684181, "name": "Clothing & Accessories"},
+        "computers": {"id": 172282, "name": "Computers"},
+        "industrial": {"id": 1064954, "name": "Industrial & Scientific"},
+        "musical_instruments": {"id": 119667011, "name": "Musical Instruments"},
+    }
+
+    # Only show categories that are approved
+    categories = []
+    for cat_id in approved_cats:
+        if cat_id in eligibility_to_keepa:
+            categories.append(eligibility_to_keepa[cat_id])
+
+    # If no categories configured, show all open ones
+    if not categories:
+        categories = [
+            {"id": 1055398, "name": "Home & Kitchen"},
+            {"id": 165796011, "name": "Tools & Home Improvement"},
+            {"id": 2619533011, "name": "Sports & Outdoors"},
+            {"id": 3375251, "name": "Pet Supplies"},
+            {"id": 2238192011, "name": "Office Products"},
+            {"id": 172282, "name": "Electronics"},
+            {"id": 599676, "name": "Automotive"},
+        ]
 
     return templates.TemplateResponse("scanner.html", {
         "request": request,
