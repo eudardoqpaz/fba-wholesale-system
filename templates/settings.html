@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+{% block title %}Configuracion - FBA System{% endblock %}
+{% block page_title %}Configuracion{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    <div class="col-lg-8">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-gear"></i> Categorias que Puedes Vender</h6>
+            </div>
+            <div class="card-body">
+                <p class="text-muted mb-3">
+                    Marca las categorias en las QUE PUEDES VENDER. El sistema filtrara automaticamente 
+                    los productos de categorias que NO esten marcadas.
+                </p>
+                <div class="alert alert-info small">
+                    <strong>Como saber si puedes vender?</strong> Ve a 
+                    <a href="https://sellercentral.amazon.com/product-search" target="_blank">Seller Central -> Add a Product</a>
+                    y busca un producto de la categoria. Si dice "Sell Yours" = puedes. Si dice "Request Approval" = necesitas aprobacion.
+                </div>
+
+                <div id="categories-container">
+                    <!-- Loaded by JS -->
+                </div>
+
+                <button class="btn btn-warning w-100 mt-3" onclick="saveEligibility()">
+                    <i class="bi bi-check-circle"></i> GUARDAR CONFIGURACION
+                </button>
+                <div id="save-result" class="mt-2"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Guia Rapida</h6>
+            </div>
+            <div class="card-body">
+                <h6 class="text-warning">Categorias ABIERTAS (sin aprobacion):</h6>
+                <ul class="small">
+                    <li>Home & Kitchen</li>
+                    <li>Tools & Home Improvement</li>
+                    <li>Sports & Outdoors</li>
+                    <li>Pet Supplies</li>
+                    <li>Office Products</li>
+                    <li>Electronics</li>
+                    <li>Clothing</li>
+                    <li>Automotive</li>
+                </ul>
+
+                <h6 class="text-danger mt-3">Categorias RESTRINGIDAS (necesitan aprobacion):</h6>
+                <ul class="small">
+                    <li>Beauty & Personal Care</li>
+                    <li>Health & Household</li>
+                    <li>Grocery & Gourmet Food</li>
+                    <li>Baby Products</li>
+                    <li>Toys & Games</li>
+                    <li>Jewelry</li>
+                </ul>
+
+                <div class="alert alert-warning small mt-3">
+                    <strong>Para desbloquear categorias restringidas:</strong>
+                    <ol class="mb-0 mt-1">
+                        <li>Compra una pequena cantidad del producto</li>
+                        <li>Guarda la factura del proveedor</li>
+                        <li>Ve a Seller Central -> Request Approval</li>
+                        <li>Sube la factura</li>
+                        <li>Espera 2-5 dias</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="card mt-3">
+            <div class="card-header">
+                <h6 class="mb-0"><i class="bi bi-link"></i> Links Utiles</h6>
+            </div>
+            <div class="card-body">
+                <a href="https://sellercentral.amazon.com/product-search" target="_blank" class="btn btn-sm btn-outline-warning w-100 mb-2">
+                    Verificar Producto en Seller Central
+                </a>
+                <a href="https://sellercentral.amazon.com/help/hub/reference/external/G200140860" target="_blank" class="btn btn-sm btn-outline-secondary w-100">
+                    Lista Oficial de Restricciones
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+async function loadEligibility() {
+    try {
+        const resp = await fetch('/settings/api/eligibility');
+        const data = await resp.json();
+        renderCategories(data.categories);
+    } catch (err) {
+        document.getElementById('categories-container').innerHTML = 
+            '<div class="alert alert-danger">Error cargando configuracion</div>';
+    }
+}
+
+function renderCategories(categories) {
+    const container = document.getElementById('categories-container');
+    let html = '';
+
+    // Open categories first
+    const openCats = categories.filter(c => c.typically_open);
+    const restrictedCats = categories.filter(c => !c.typically_open);
+
+    html += '<h6 class="text-success mb-2"><i class="bi bi-unlock"></i> Categorias Abiertas</h6>';
+    html += '<div class="mb-3">';
+    openCats.forEach(cat => {
+        html += renderCategoryCard(cat);
+    });
+    html += '</div>';
+
+    html += '<h6 class="text-danger mb-2"><i class="bi bi-lock"></i> Categorias Restringidas</h6>';
+    html += '<div class="mb-3">';
+    restrictedCats.forEach(cat => {
+        html += renderCategoryCard(cat);
+    });
+    html += '</div>';
+
+    container.innerHTML = html;
+}
+
+function renderCategoryCard(cat) {
+    const difficultyColor = {
+        'easy': 'success',
+        'medium': 'warning',
+        'hard': 'danger',
+    };
+    const diffBadge = difficultyColor[cat.approval_difficulty] || 'secondary';
+
+    return `
+        <div class="form-check p-2 mb-1 rounded" style="background:var(--bg-dark);border:1px solid var(--border-color);">
+            <input class="form-check-input" type="checkbox" id="cat-${cat.id}" 
+                   value="${cat.id}" ${cat.approved ? 'checked' : ''}>
+            <label class="form-check-label d-flex justify-content-between align-items-center w-100" for="cat-${cat.id}">
+                <span>${cat.name}</span>
+                <span>
+                    ${cat.approved ? '<span class="badge bg-success">Aprobado</span>' : ''}
+                    <span class="badge bg-${diffBadge}">${cat.approval_difficulty}</span>
+                </span>
+            </label>
+            ${cat.note ? `<small class="text-muted d-block ms-4">${cat.note}</small>` : ''}
+        </div>
+    `;
+}
+
+async function saveEligibility() {
+    const checkboxes = document.querySelectorAll('#categories-container input[type="checkbox"]:checked');
+    const categories = Array.from(checkboxes).map(cb => cb.value);
+
+    try {
+        const resp = await fetch('/settings/api/eligibility', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({categories: categories}),
+        });
+        const data = await resp.json();
+        document.getElementById('save-result').innerHTML = 
+            `<div class="alert alert-success">Guardado! ${data.approved} categorias aprobadas.</div>`;
+    } catch (err) {
+        document.getElementById('save-result').innerHTML = 
+            `<div class="alert alert-danger">Error: ${err.message}</div>`;
+    }
+}
+
+// Load on page load
+loadEligibility();
+</script>
+{% endblock %}

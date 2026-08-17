@@ -13,6 +13,7 @@ from services.scanner import scanner
 from services.scraper import scraper
 from services.calculator import ProfitCalculator
 from services.excel_export import generate_scan_results_excel, generate_shopping_list_excel
+from services.eligibility import eligibility_service
 from pydantic import BaseModel
 from typing import Optional
 import io
@@ -248,20 +249,27 @@ async def export_to_csv(data: dict):
 # ─── AI Select Best Products ───
 
 @router.post("/api/ai-select")
-async def ai_select_best(query: AISelectQuery):
+async def ai_select_best(query: AISelectQuery, db: AsyncSession = Depends(get_db)):
     """AI analyzes all products and selects the best ones within budget."""
     products = query.products
     budget = query.budget
     max_products = query.max_products
 
+    # Filter by eligibility - remove restricted categories
+    approved_products, restricted_products = await eligibility_service.filter_approved_products(products, db)
+
     # Debug counters
     debug = {
         "total_products": len(products),
+        "restricted_category": len(restricted_products),
         "no_price": 0,
         "low_volume": 0,
         "low_profit": 0,
         "passed_filters": 0,
     }
+
+    # Only process approved products
+    products = approved_products
 
     # Minimum thresholds
     MIN_MONTHLY_SALES = 100  # Lowered to include more products
@@ -435,6 +443,10 @@ async def ai_select_best(query: AISelectQuery):
         "total_candidates": len(analyzed),
         "budget_used_pct": round((budget - remaining) / budget * 100, 1),
         "debug": debug,  # Show what happened
+        "restricted_products": [
+            {"asin": p.get("asin"), "title": p.get("title", "")[:60], "category": p.get("_category_name", "")}
+            for p in restricted_products[:10]
+        ],
     }
 
 
