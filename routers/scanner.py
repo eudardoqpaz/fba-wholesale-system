@@ -254,10 +254,19 @@ async def ai_select_best(query: AISelectQuery):
     budget = query.budget
     max_products = query.max_products
 
-    # Minimum thresholds for a product to be considered
-    MIN_MONTHLY_SALES = 300  # Reject anything under 300 sales/month
-    MIN_PROFIT = 2.00        # Minimum $2 profit per unit
-    MIN_PRICE = 12.00        # Minimum sell price
+    # Debug counters
+    debug = {
+        "total_products": len(products),
+        "no_price": 0,
+        "low_volume": 0,
+        "low_profit": 0,
+        "passed_filters": 0,
+    }
+
+    # Minimum thresholds
+    MIN_MONTHLY_SALES = 100  # Lowered to include more products
+    MIN_PROFIT = 1.50        # Lowered minimum profit
+    MIN_PRICE = 10.00        # Minimum sell price
 
     # Calculate profitability for each product
     analyzed = []
@@ -270,11 +279,12 @@ async def ai_select_best(query: AISelectQuery):
             0
         )
 
-        # Skip products with no price or too cheap
+        # Debug: count products with no price
         if sell_price < MIN_PRICE:
+            debug["no_price"] += 1
             continue
 
-        # Get monthly sales - this is the MOST IMPORTANT metric
+        # Get monthly sales
         monthly_sales = (
             p.get("monthly_sales_est", 0) or
             p.get("monthly_sales", 0) or
@@ -282,39 +292,44 @@ async def ai_select_best(query: AISelectQuery):
             0
         )
 
-        # HARD FILTER: Reject low-volume products immediately
+        # Debug: count low volume products
         if monthly_sales < MIN_MONTHLY_SALES:
+            debug["low_volume"] += 1
             continue
 
         # Get supplier cost (estimate if not provided)
         supplier_cost = p.get("supplier_cost", 0) or (sell_price * 0.55)
+
+        # Get FBA fee from product data
+        fba_fee = p.get("fba_fee", 0) or 0
 
         # Calculate profitability
         calc = ProfitCalculator.calculate(
             sell_price=sell_price,
             buy_price=supplier_cost,
             weight_lbs=p.get("weight_lbs", 1.0),
-            keepa_fba_fee=p.get("fba_fee"),
+            keepa_fba_fee=fba_fee if fba_fee > 0 else None,
             keepa_referral_pct=p.get("referral_fee_pct"),
         )
 
         roi = calc.get("roi_pct", 0)
         profit = calc.get("net_profit", 0)
 
-        # Skip if not profitable enough
+        # Debug: count low profit products
         if profit < MIN_PROFIT:
+            debug["low_profit"] += 1
             continue
+
+        debug["passed_filters"] += 1
 
         sellers = p.get("fba_seller_count", 99) or 99
         bsr = p.get("bsr", 999999) or 999999
         is_amazon = p.get("is_amazon_seller", False)
 
-        # ═══════════════════════════════════════════
-        # SCORING ALGORITHM - Volume is KING
-        # ═══════════════════════════════════════════
+        # SCORING - Volume is KING
         score = 0
 
-        # VOLUME SCORE (0-50 points) - MOST IMPORTANT
+        # VOLUME (0-50 points)
         if monthly_sales >= 10000:
             score += 50
         elif monthly_sales >= 5000:
@@ -326,9 +341,11 @@ async def ai_select_best(query: AISelectQuery):
         elif monthly_sales >= 500:
             score += 15
         elif monthly_sales >= 300:
+            score += 10
+        elif monthly_sales >= 100:
             score += 5
 
-        # ROI SCORE (0-25 points)
+        # ROI (0-25 points)
         if roi >= 30:
             score += 25
         elif roi >= 25:
@@ -338,7 +355,7 @@ async def ai_select_best(query: AISelectQuery):
         elif roi >= 15:
             score += 10
 
-        # PROFIT PER UNIT (0-15 points)
+        # PROFIT (0-15 points)
         if profit >= 8:
             score += 15
         elif profit >= 5:
@@ -358,12 +375,11 @@ async def ai_select_best(query: AISelectQuery):
 
         # PENALTIES
         if is_amazon:
-            score -= 40  # NEVER compete with Amazon
-
+            score -= 40
         if bsr > 50000:
-            score -= 10  # Bad BSR penalty
+            score -= 10
 
-        # Risk assessment
+        # Risk
         risk = "BAJO"
         if is_amazon or sellers > 15 or bsr > 50000:
             risk = "ALTO"
@@ -372,7 +388,7 @@ async def ai_select_best(query: AISelectQuery):
 
         analyzed.append({
             **p,
-            "sell_price": sell_price,  # Ensure price is set correctly
+            "sell_price": sell_price,
             "amazon_price": sell_price,
             "supplier_cost_estimated": round(supplier_cost, 2),
             "calc": calc,
@@ -381,18 +397,17 @@ async def ai_select_best(query: AISelectQuery):
             "priority_reasons": _get_priority_reasons(roi, profit, monthly_sales, sellers, is_amazon),
         })
 
-    # Sort by score (best first)
+    # Sort by score
     analyzed.sort(key=lambda x: x["score"], reverse=True)
 
     # Select top products within budget
     selected = []
     remaining = budget
-    for p in analyzed[:max_products * 3]:  # Consider more candidates
+    for p in analyzed[:max_products * 3]:
         cost = p.get("supplier_cost_estimated", 0)
         if cost <= 0:
             continue
 
-        # How many can we buy?
         qty = min(int(remaining / cost), 30)
         if qty < 3:
             continue
@@ -419,7 +434,7 @@ async def ai_select_best(query: AISelectQuery):
         ),
         "total_candidates": len(analyzed),
         "budget_used_pct": round((budget - remaining) / budget * 100, 1),
-        "rejected_low_volume": sum(1 for p in products if (p.get("monthly_sales_est", 0) or 0) < MIN_MONTHLY_SALES),
+        "debug": debug,  # Show what happened
     }
 
 
